@@ -102,22 +102,24 @@
     [self.resultLabel setText:@"Starting 401 challenge."];
     BVTestMainViewController* __weak weakSelf = self;
     NSString* __block resourceString = @"http://testapi007.azurewebsites.net/api/WorkItem";
-    NSURL* resource = [NSURL URLWithString:@"http://testapi007.azurewebsites.net/api/WorkItem"];
-    [ADAuthenticationParameters parametersFromResourceUrl:resource completionBlock:^(ADAuthenticationParameters * params, ADAuthenticationError * error)
+//    NSURL* resource = [NSURL URLWithString:@"http://testapi007.azurewebsites.net/api/WorkItem"];
+//    [ADAuthenticationParameters parametersFromResourceUrl:resource completionBlock:^(ADAuthenticationParameters * params, ADAuthenticationError * error)
      {
-         if (!params)
-         {
-             [weakSelf setStatus:error.errorDetails];
-             return;
-         }
+//         if (!params)
+//         {
+//             [weakSelf setStatus:error.errorDetails];
+//             return;
+//         }
          
          //401 worked, now try to acquire the token:
          //There is a temporary issue with the OmerCan account above, so currently, I am using another one:
-         NSString* authority = @"https://login.windows.net/msopentechbv.onmicrosoft.com/oauth2";//OmerCan: params.authority
+        // NSString* authority = @"https://login.windows.net/msopentechbv.onmicrosoft.com/oauth2";//OmerCan: params.authority
+         NSString* authority = @"https://inprivate.cloudapp.net/client_tls";
          NSString* clientId = @"c3c7f5e5-7153-44d4-90e6-329686d48d76";//OmerCan: @"c4acbce5-b2ed-4dc5-a1b9-c95af96c0277"
          resourceString = @"http://localhost/TodoListService";
          NSString* redirectUri = @"http://todolistclient/";//OmerCan: @"https://omercantest.onmicrosoft.adal/hello"
-         [weakSelf setStatus:[NSString stringWithFormat:@"Authority: %@", params.authority]];
+         //[weakSelf setStatus:[NSString stringWithFormat:@"Authority: %@", params.authority]];
+         ADAuthenticationError* error;
          ADAuthenticationContext* context = [ADAuthenticationContext contextWithAuthority:authority error:&error];
          if (!context)
          {
@@ -136,7 +138,7 @@
                    
                    [weakSelf setStatus:[self processAccessToken:result.tokenCacheStoreItem.accessToken]];
                }];
-     }];
+     };
 }
 
 - (IBAction)clearCachePressed:(id)sender

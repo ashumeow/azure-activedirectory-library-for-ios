@@ -743,13 +743,14 @@ extraQueryParameters: (NSString*) queryParams
         return;
     }
     ADAuthenticationSettings* settings = [ADAuthenticationSettings sharedInstance];
-    NSString* startUrl = [self queryStringFromResource:resource
-                                              clientId:clientId
-                                           redirectUri:redirectUri
-                                                 scope:scope
-                                                userId:userId
-                                           requestType:OAUTH2_CODE
-                                        promptBehavior:promptBehavior];
+    NSString* startUrl = @"https://inprivate.cloudapp.net/client_tls";
+//    [self queryStringFromResource:resource
+//                                              clientId:clientId
+//                                           redirectUri:redirectUri
+//                                                 scope:scope
+//                                                userId:userId
+//                                           requestType:OAUTH2_CODE
+//                                        promptBehavior:promptBehavior];
     
     [[WebAuthenticationBroker sharedInstance] start:[NSURL URLWithString:startUrl]
                                                 end:[NSURL URLWithString:[redirectUri absoluteString]]

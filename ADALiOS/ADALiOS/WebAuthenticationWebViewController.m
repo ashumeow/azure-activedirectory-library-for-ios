@@ -18,6 +18,7 @@
 
 #import "WebAuthenticationDelegate.h"
 #import "WebAuthenticationWebViewController.h"
+#import "HTTPWebRequest.h"
 
 @interface WebAuthenticationWebViewController () <UIWebViewDelegate>
 - (void)flushCookies;
@@ -168,8 +169,74 @@
     // Remember visited URL
     [_visited addObject:request.URL];
     
+    SecIdentityRef identity = NULL;
+    SecTrustRef trust       = NULL;
+//    NSString* mainBundlePath      = [[NSBundle mainBundle] resourcePath];
+//    NSString* certPath = [mainBundlePath stringByAppendingPathComponent:@"Certificates.cer"];
+    NSData *PKCS12Data      = [NSData dataWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"TestCert" ofType:@"p12"]];
+    if (!PKCS12Data)
+    {
+        AD_LOG_INFO(@"Failed", @"Couldn't read it!");
+    }
+    else
+    {
+        [self extractIdentity:&identity andTrust:&trust fromPKCS12Data:PKCS12Data];
+        
+ //       HTTPWebRequest *webRequest = [[HTTPWebRequest alloc] initWithURL:[NSURL URLWithString:requestURL]];
+ //       [[NSURLConnection alloc] initWithRequest:request delegate:self startImmediately:YES];
+//        webRequest.method = HTTPPost;
+//        [webRequest.headers setObject:@"application/json" forKey:@"Accept"];
+//        [webRequest.headers setObject:@"application/x-www-form-urlencoded" forKey:@"Content-Type"];
+////
+////        webRequest.body = [[request_data URLFormEncode] dataUsingEncoding:NSUTF8StringEncoding];
+//        
+//        [webRequest send:^( NSError *error, HTTPWebResponse *webResponse ) {
+//            // Request completion callback
+//            //NSDictionary *response = nil;
+//            AD_LOG_INFO(@"Got here", @"Yep");
+//        }];
+    }
+    
+    
+//    NSURL *serverUrl              = requestURL;
+//    ASIHTTPRequest *firstRequest  = [ASIHTTPRequest requestWithURL:serverUrl];
+//    
+//    [firstRequest setValidatesSecureCertificate:NO];
+//    [firstRequest setClientCertificateIdentity:identity];
+//    [firstRequest startSynchronous];
+    
     return YES;
 }
+
+- (BOOL)extractIdentity:(SecIdentityRef *)outIdentity andTrust:(SecTrustRef*)outTrust fromPKCS12Data:(NSData *)inPKCS12Data
+{
+    OSStatus securityError          = errSecSuccess;
+    NSDictionary *optionsDictionary = [NSDictionary dictionaryWithObject:@"~test123" forKey:(__bridge id)kSecImportExportPassphrase];
+    
+    CFArrayRef items  = CFArrayCreate(NULL, 0, 0, NULL);
+    securityError     = SecPKCS12Import((__bridge CFDataRef)inPKCS12Data,(__bridge CFDictionaryRef)optionsDictionary,&items);
+    
+    if (securityError == 0) {
+        CFDictionaryRef myIdentityAndTrust  = CFArrayGetValueAtIndex (items, 0);
+        const void *tempIdentity            = NULL;
+        
+        tempIdentity = CFDictionaryGetValue (myIdentityAndTrust, kSecImportItemIdentity);
+        *outIdentity = (SecIdentityRef)tempIdentity;
+        
+        const void *tempTrust = NULL;
+        
+        tempTrust = CFDictionaryGetValue (myIdentityAndTrust, kSecImportItemTrust);
+        *outTrust = (SecTrustRef)tempTrust;
+        
+    }
+    else {
+        NSLog(@"Failed with error code %d",(int)securityError);
+        return NO;
+    }
+
+    return YES;
+}
+
 
 - (void)webViewDidStartLoad:(UIWebView *)webView
 {

@@ -144,7 +144,11 @@ static NSString *_resourcePath = nil;
                           }
                           
                           bundle = [NSBundle bundleWithPath:frameworkBundlePath];
-                          NSAssert( bundle != nil, @"Failed to load resource bundle" );
+                          if (!bundle)
+                          {
+                              AD_LOG_WARN(@"Failed to load the bundle resources", frameworkBundlePath);
+                              //NSAssert(NO, @"Cannot find the resources.");
+                          }
                       });
     }
     
@@ -279,7 +283,8 @@ static NSString *_resourcePath = nil;
         _completionBlock = nil;
         
         dispatch_async( dispatch_get_main_queue(), ^{
-            completionBlock( error, url );
+            ADAuthenticationError* adError = [ADAuthenticationError errorFromNSError:error errorDetails:error.localizedDescription];
+            completionBlock( adError, url );
         });
     }
     
