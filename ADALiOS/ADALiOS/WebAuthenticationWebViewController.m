@@ -144,7 +144,7 @@
 #pragma unused(webView)
 #pragma unused(navigationType)
     
-    //DebugLog( @"URL: %@", request.URL.absoluteString );
+    DebugLog( @"URL: %@", request.URL.absoluteString );
     
     // TODO: We lowercase both URLs, is this the right thing to do?
     NSString *requestURL = [[request.URL absoluteString] lowercaseString];
@@ -169,18 +169,18 @@
     // Remember visited URL
     [_visited addObject:request.URL];
     
-    SecIdentityRef identity = NULL;
-    SecTrustRef trust       = NULL;
-//    NSString* mainBundlePath      = [[NSBundle mainBundle] resourcePath];
-//    NSString* certPath = [mainBundlePath stringByAppendingPathComponent:@"Certificates.cer"];
-    NSData *PKCS12Data      = [NSData dataWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"TestCert" ofType:@"p12"]];
-    if (!PKCS12Data)
+    if (NO)
     {
-        AD_LOG_INFO(@"Failed", @"Couldn't read it!");
-    }
-    else
-    {
-        [self extractIdentity:&identity andTrust:&trust fromPKCS12Data:PKCS12Data];
+        SecIdentityRef identity = NULL;
+        SecTrustRef trust       = NULL;
+        NSData *PKCS12Data      = [NSData dataWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"TestCert" ofType:@"p12"]];
+        if (!PKCS12Data)
+        {
+            AD_LOG_INFO(@"Failed", @"Couldn't read it!");
+        }
+        else
+        {
+            [self extractIdentity:&identity andTrust:&trust fromPKCS12Data:PKCS12Data];
         
  //       HTTPWebRequest *webRequest = [[HTTPWebRequest alloc] initWithURL:[NSURL URLWithString:requestURL]];
  //       [[NSURLConnection alloc] initWithRequest:request delegate:self startImmediately:YES];
@@ -195,6 +195,7 @@
 //            //NSDictionary *response = nil;
 //            AD_LOG_INFO(@"Got here", @"Yep");
 //        }];
+        }
     }
     
     

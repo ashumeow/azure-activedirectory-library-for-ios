@@ -56,6 +56,7 @@
 		8B598961181710FD00744AEE /* ADDefaultTokenCacheStoreTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B598960181710FD00744AEE /* ADDefaultTokenCacheStoreTests.m */; };
 		8B598963181739AA00744AEE /* ADAuthenticationErrorTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B598962181739AA00744AEE /* ADAuthenticationErrorTests.m */; };
 		8B6613B518346080008BDD3F /* ADAuthenticationResultTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B6613B418346080008BDD3F /* ADAuthenticationResultTests.m */; };
+		8B72EB72185A82F90022EE2A /* HTTPProtocol.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B72EB71185A82F90022EE2A /* HTTPProtocol.m */; };
 		8B7E6FC81856A1E8000DC3C8 /* ADOAuth2Constants.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B7E6FC71856A1E8000DC3C8 /* ADOAuth2Constants.m */; };
 		8B81CE3418188728005CFD65 /* ADTestTokenCacheStore.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B81CE3318188728005CFD65 /* ADTestTokenCacheStore.m */; };
 		8B92DB5F1819E6A4004AAB0E /* XCTestCase+TestHelperMethods.m in Sources */ = {isa = PBXBuildFile; fileRef = 8B92DB5E1819E6A4004AAB0E /* XCTestCase+TestHelperMethods.m */; };
@@ -187,6 +188,8 @@
 		8B598960181710FD00744AEE /* ADDefaultTokenCacheStoreTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ADDefaultTokenCacheStoreTests.m; sourceTree = "<group>"; };
 		8B598962181739AA00744AEE /* ADAuthenticationErrorTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ADAuthenticationErrorTests.m; sourceTree = "<group>"; };
 		8B6613B418346080008BDD3F /* ADAuthenticationResultTests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ADAuthenticationResultTests.m; sourceTree = "<group>"; };
+		8B72EB70185A82F20022EE2A /* HTTPProtocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HTTPProtocol.h; sourceTree = "<group>"; };
+		8B72EB71185A82F90022EE2A /* HTTPProtocol.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = HTTPProtocol.m; sourceTree = "<group>"; };
 		8B7E6FC61856A1E8000DC3C8 /* ADOAuth2Constants.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ADOAuth2Constants.h; sourceTree = "<group>"; };
 		8B7E6FC71856A1E8000DC3C8 /* ADOAuth2Constants.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ADOAuth2Constants.m; sourceTree = "<group>"; };
 		8B81CE3218188728005CFD65 /* ADTestTokenCacheStore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ADTestTokenCacheStore.h; sourceTree = "<group>"; };
@@ -296,6 +299,8 @@
 		8B0965AF17F25770002BDFB8 /* ADALiOS */ = {
 			isa = PBXGroup;
 			children = (
+				8B72EB70185A82F20022EE2A /* HTTPProtocol.h */,
+				8B72EB71185A82F90022EE2A /* HTTPProtocol.m */,
 				8B0965B217F25770002BDFB8 /* ADALiOS.h */,
 				8B0965B417F25770002BDFB8 /* ADALiOS.m */,
 				8BB8345A18074A58007F9F0D /* ADAuthenticationContext.h */,
@@ -554,6 +559,7 @@
 			files = (
 				8B343450183305A6002DE1DC /* WebAuthenticationWebViewController.m in Sources */,
 				8B59895E1811C72400744AEE /* ADDefaultTokenCacheStore.m in Sources */,
+				8B72EB72185A82F90022EE2A /* HTTPProtocol.m in Sources */,
 				8B7E6FC81856A1E8000DC3C8 /* ADOAuth2Constants.m in Sources */,
 				8B34343A1833049B002DE1DC /* NSStringExtensions.m in Sources */,
 				8B343444183304FE002DE1DC /* HTTPWebResponse.m in Sources */,

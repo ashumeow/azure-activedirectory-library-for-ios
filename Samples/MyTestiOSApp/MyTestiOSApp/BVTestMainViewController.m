@@ -32,6 +32,7 @@
 - (IBAction)getUsersPressed:(id)sender;
 - (IBAction)refreshTokenPressed:(id)sender;
 - (IBAction)expireAllPressed:(id)sender;
+@property (weak, nonatomic) IBOutlet UIButton *end2end;
 
 @end
 
@@ -99,6 +100,23 @@
 
 - (IBAction)pressMeAction:(id)sender
 {
+//    NSArray  *paths = NSSearchPathForDirectoriesInDomains( NSCachesDirectory, NSUserDomainMask, YES );
+//    NSString* path = [[paths objectAtIndex:0] stringByAppendingPathComponent:@"test.html"];
+//    NSData* contents = [@"blah bhal" dataUsingEncoding:NSASCIIStringEncoding];
+//    [[NSFileManager defaultManager] createFileAtPath:path
+//                                            contents:contents
+//                                          attributes:nil];
+//    UIDocumentInteractionController* docController = [[UIDocumentInteractionController alloc] init];
+//    CGPoint pt = {0, 0};
+//    CGSize size = {100, 100};
+//    CGRect rect = {pt,size};
+//    [docController presentOpenInMenuFromRect:rect inView:sender animated:NO];
+    
+    
+//    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"http://bing.com"]];
+//    return;
+    
+    
     [self.resultLabel setText:@"Starting 401 challenge."];
     BVTestMainViewController* __weak weakSelf = self;
     NSString* __block resourceString = @"http://testapi007.azurewebsites.net/api/WorkItem";
