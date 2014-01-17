@@ -1,10 +1,21 @@
+// Created by Boris Vidolov on 11/13/13.
+// Copyright © Microsoft Open Technologies, Inc.
 //
-//  ADAuthenticationResultTests.m
-//  ADALiOS
+// All Rights Reserved
 //
-//  Created by Boris Vidolov on 11/13/13.
-//  Copyright (c) 2013 MS Open Tech. All rights reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// THIS CODE IS PROVIDED *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS
+// OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+// ANY IMPLIED WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A
+// PARTICULAR PURPOSE, MERCHANTABILITY OR NON-INFRINGEMENT.
+//
+// See the Apache License, Version 2.0 for the specific language
+// governing permissions and limitations under the License.
 
 #import <XCTest/XCTest.h>
 #import "ADAuthenticationResult+Internal.h"
@@ -20,12 +31,12 @@
 - (void)setUp
 {
     [super setUp];
-    // Put setup code here; it will be run once, before the first test case.
+    [self adTestBegin];
 }
 
 - (void)tearDown
 {
-    // Put teardown code here; it will be run once, after the last test case.
+    [self adTestEnd];
     [super tearDown];
 }
 
@@ -61,7 +72,7 @@
 -(void) testResultFromError
 {
     ADAuthenticationError* error = [ADAuthenticationError unexpectedInternalError:@"something"];
-    ADAuthenticationResult* result = [ADAuthenticationResult resultFromError:error];
+    ADAuthenticationResult* result = [ADAuthenticationResult resultFromError:error correlationId:nil];
     [self verifyErrorResult:result errorCode:AD_ERROR_UNEXPECTED];
     XCTAssertEqualObjects(result.error, error, "Different error object in the result.");
 }
@@ -81,7 +92,7 @@
 
 -(void) testResultFromTokenCacheStoreItem
 {
-    ADAuthenticationResult* nilItemResult = [ADAuthenticationResult resultFromTokenCacheStoreItem:nil];
+    ADAuthenticationResult* nilItemResult = [ADAuthenticationResult resultFromTokenCacheStoreItem:nil multiResourceRefreshToken:NO  correlationId:nil];
     [self verifyErrorResult:nilItemResult errorCode:AD_ERROR_UNEXPECTED];
     
     ADTokenCacheStoreItem* item = [[ADTokenCacheStoreItem alloc] init];
@@ -98,24 +109,19 @@
     item.tenantId = @"tenantId";
     
     //Copy the item to ensure that it is not modified withing the method call below:
-    ADAuthenticationResult* resultFromValidItem = [ADAuthenticationResult resultFromTokenCacheStoreItem:[item copy]];
+    ADAuthenticationResult* resultFromValidItem = [ADAuthenticationResult resultFromTokenCacheStoreItem:[item copy] multiResourceRefreshToken:NO  correlationId:nil];
     [self verifyResult:resultFromValidItem item:item];
-    
-    //Turn into bad item:
-    item.resource = nil;
-    ADAuthenticationResult* resultFromBadKeyItem = [ADAuthenticationResult resultFromTokenCacheStoreItem:[item copy]];
-    [self verifyErrorResult:resultFromBadKeyItem errorCode:AD_ERROR_INVALID_ARGUMENT];
     
     //Nil access token:
     item.resource = @"resource";//Restore
     item.accessToken = nil;
-    ADAuthenticationResult* resultFromNilAccessToken = [ADAuthenticationResult resultFromTokenCacheStoreItem:[item copy]];
+    ADAuthenticationResult* resultFromNilAccessToken = [ADAuthenticationResult resultFromTokenCacheStoreItem:[item copy] multiResourceRefreshToken:NO  correlationId:nil];
     [self verifyErrorResult:resultFromNilAccessToken errorCode:AD_ERROR_UNEXPECTED];
 
     //Empty access token:
     item.resource = @"resource";//Restore
     item.accessToken = @"   ";
-    ADAuthenticationResult* resultFromEmptyAccessToken = [ADAuthenticationResult resultFromTokenCacheStoreItem:[item copy]];
+    ADAuthenticationResult* resultFromEmptyAccessToken = [ADAuthenticationResult resultFromTokenCacheStoreItem:[item copy] multiResourceRefreshToken:NO  correlationId:nil];
     [self verifyErrorResult:resultFromEmptyAccessToken errorCode:AD_ERROR_UNEXPECTED];
 }
 

@@ -19,7 +19,8 @@
 
 #import "XCTestCase+TestHelperMethods.h"
 #import <ADALiOS/ADTokenCacheStoreItem.h>
-
+#import <ADALioS/ADAuthenticationSettings.h>
+#import <libkern/OSAtomic.h>
 
 @implementation XCTestCase (TestHelperMethods)
 
@@ -31,6 +32,8 @@ NSMutableString* sErrorCodesLog;
 
 NSString* sTestBegin = @"|||TEST_BEGIN|||";
 NSString* sTestEnd = @"|||TEST_END|||";
+
+volatile int sAsyncExecuted;//The number of asynchronous callbacks executed.
 
 /*! See header for comments */
 -(void) assertValidText: (NSString*) text
@@ -78,16 +81,18 @@ NSString* sTestEnd = @"|||TEST_END|||";
 /*! Sets logging and other infrastructure for a new test */
 -(void) adTestBegin
 {
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        sLogLevelsLog = [NSMutableString new];
-        sMessagesLog = [NSMutableString new];
-        sInformationLog = [NSMutableString new];
-        sErrorCodesLog = [NSMutableString new];
-    });
     @synchronized(self.class)
     {
-        //Write begging of the test:
+        static dispatch_once_t once;
+
+        dispatch_once(&once, ^{
+            sLogLevelsLog = [NSMutableString new];
+            sMessagesLog = [NSMutableString new];
+            sInformationLog = [NSMutableString new];
+            sErrorCodesLog = [NSMutableString new];
+        });
+
+        //Note beginning of the test:
         [sLogLevelsLog appendString:sTestBegin];
         [sMessagesLog appendString:sTestBegin];
         [sInformationLog appendString:sTestBegin];
@@ -105,14 +110,26 @@ NSString* sTestEnd = @"|||TEST_END|||";
             [sLogLevelsLog appendFormat:@"|%u|", logLevel];
             [sMessagesLog appendFormat:@"|%@|", message];
             [sInformationLog appendFormat:@"|%@|", additionalInformation];
-            [sErrorCodesLog appendFormat:@"|%lu|", errorCode];
+            [sErrorCodesLog appendFormat:@"|%lu|", (long)errorCode];
         }
     };
 
     
     [ADLogger setLogCallBack:logCallback];
     [ADLogger setLevel:ADAL_LOG_LAST];//Log everything by default. Tests can change this.
+    [ADLogger setNSLogging:NO];//Disables the NS logging to avoid generating huge amount of system logs.
     XCTAssertEqual(logCallback, [ADLogger getLogCallBack], "Setting of logCallBack failed.");
+}
+
+#ifdef AD_CODE_COVERAGE
+extern void __gcov_flush(void);
+#endif
+-(void) flushCodeCoverage
+{
+    //TODO: check if executed within a code coverage build!
+#ifdef AD_CODE_COVERAGE
+    __gcov_flush();
+#endif
 }
 
 /*! Clears logging and other infrastructure after a test */
@@ -128,43 +145,55 @@ NSString* sTestEnd = @"|||TEST_END|||";
         [sErrorCodesLog appendString:sTestEnd];
     }
     XCTAssertNil([ADLogger getLogCallBack], "Clearing of logCallBack failed.");
+    [self flushCodeCoverage];
 }
 
-//Parses backwords the log to find the test begin prefix. Returns the beginning
+//Parses backwards the log to find the test begin prefix. Returns the beginning
 //of the log string if not found:
 -(long) indexOfTestBegin: (NSString*) log
 {
-    NSUInteger index = [sLogLevelsLog rangeOfString:sTestBegin options:NSBackwardsSearch].location;
+    NSUInteger index = [log rangeOfString:sTestBegin options:NSBackwardsSearch].location;
     return (index == NSNotFound) ? 0 : index;
 }
 
 -(NSString*) adLogLevelLogs
 {
-    return [sLogLevelsLog substringFromIndex:[self indexOfTestBegin:sLogLevelsLog]];
+    NSString* toReturn;
+    @synchronized(self.class)
+    {
+        toReturn = [sLogLevelsLog substringFromIndex:[self indexOfTestBegin:sLogLevelsLog]];
+    }
+    return toReturn;
 }
 
 -(NSString*) adMessagesLogs
 {
-    return [sMessagesLog substringFromIndex:[self indexOfTestBegin:sMessagesLog]];
+    NSString* toReturn;
+    @synchronized(self.class)
+    {
+        toReturn = [sMessagesLog substringFromIndex:[self indexOfTestBegin:sMessagesLog]];
+    }
+    return toReturn;
 }
 
 -(NSString*) adInformationLogs
 {
-    return [sInformationLog substringFromIndex:[self indexOfTestBegin:sInformationLog]];
+    NSString* toReturn;
+    @synchronized(self.class)
+    {
+        toReturn = [sInformationLog substringFromIndex:[self indexOfTestBegin:sInformationLog]];
+    }
+    return toReturn;
 }
 
 -(NSString*) adErrorCodesLogs
 {
-    return [sErrorCodesLog substringFromIndex:[self indexOfTestBegin:sErrorCodesLog]];
-}
-
--(void) assertLogLevelLogsContain:(NSString*) text
-{
-    NSString* logs = [self adLogLevelLogs];
-    if (![logs containsString:text])
+    NSString* toReturn;
+    @synchronized(self.class)
     {
-        XCTFail("LogLevel logs for the test do not contain '%@'", text);
+        toReturn = [sErrorCodesLog substringFromIndex:[self indexOfTestBegin:sErrorCodesLog]];
     }
+    return toReturn;
 }
 
 //Helper method to count how many times a string occurs in another string:
@@ -211,10 +240,13 @@ NSString* sTestEnd = @"|||TEST_END|||";
 
 -(void) clearLogs
 {
-    [self clearString:sLogLevelsLog];
-    [self clearString:sMessagesLog];
-    [self clearString:sInformationLog];
-    [self clearString:sErrorCodesLog];
+    @synchronized(self.class)
+    {
+        [self clearString:sLogLevelsLog];
+        [self clearString:sMessagesLog];
+        [self clearString:sInformationLog];
+        [self clearString:sErrorCodesLog];
+    }
 }
 
 -(NSString*) adGetLogs: (ADLogPart) logPart
@@ -296,5 +328,83 @@ NSString* sTestEnd = @"|||TEST_END|||";
     
     return item;
 }
+
+//Ensures that two items are the same:
+-(void) verifySameWithItem: (ADTokenCacheStoreItem*) item1
+                     item2: (ADTokenCacheStoreItem*) item2
+{
+    XCTAssertNotNil(item1);
+    XCTAssertNotNil(item2);
+    ADAssertStringEquals(item1.resource, item2.resource);
+    ADAssertStringEquals(item1.authority, item2.authority);
+    ADAssertStringEquals(item1.clientId, item2.clientId);
+    ADAssertStringEquals(item1.accessToken, item2.accessToken);
+    ADAssertStringEquals(item1.refreshToken, item2.refreshToken);
+    ADAssertDateEquals(item1.expiresOn, item2.expiresOn);
+    ADAssertStringEquals(item1.userInformation.userId, item2.userInformation.userId);
+    ADAssertStringEquals(item1.userInformation.givenName, item2.userInformation.givenName);
+    ADAssertStringEquals(item1.userInformation.familyName, item2.userInformation.familyName);
+    XCTAssertEqual(item1.userInformation.userIdDisplayable, item2.userInformation.userIdDisplayable);
+    ADAssertStringEquals(item1.tenantId, item2.tenantId);
+}
+
+-(void) callAndWaitWithFile: (NSString*) file
+                       line: (int) line
+           completionSignal: (volatile int*) signal
+                      block: (void (^)(void)) block
+{
+    THROW_ON_NIL_ARGUMENT(signal);
+    THROW_ON_NIL_EMPTY_ARGUMENT(file);
+    THROW_ON_NIL_ARGUMENT(block);
+    
+    if (*signal)
+    {
+        [self recordFailureWithDescription:@"The signal should be 0 before asynchronous execution."
+                                    inFile:file
+                                    atLine:line
+                                  expected:NO];
+        return;
+    }
+    
+    block();//Run the intended asynchronous method
+    
+    //Set up and excuted the run loop until completion:
+    NSDate* timeOut = [NSDate dateWithTimeIntervalSinceNow:10];//Waits for 10 seconds.
+    while (!(*signal) && [[NSDate dateWithTimeIntervalSinceNow:0] compare:timeOut] != NSOrderedDescending)
+    {
+        [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:timeOut];
+    }
+    if (!*signal)
+    {
+        [self recordFailureWithDescription:@"Timeout while waiting for validateAuthority callback."
+         "This can also happen if the inner callback does not end with ASYNC_BLOCK_COMPLETE"
+                                    inFile:file
+                                    atLine:line
+                                  expected:NO];
+    }
+    else
+    {
+        //Completed as expected, reset for the next execuion.
+        *signal = 0;
+    }
+}
+
+/* Called by the ASYNC_BLOCK_COMPLETE macro to signal the completion of the block
+ and handle multiple calls of the callback. See the method above for details.*/
+-(void) asynchInnerBlockCompleteWithFile: (NSString*) file
+                                    line: (int) line
+                        completionSignal: (volatile int*) signal
+{
+    if (!OSAtomicCompareAndSwapInt(0, 1, signal))//Signal completion
+    {
+        //The inner callback is called more than once.
+        //Intentionally crash the test execution. As this may happen on another thread,
+        //there is no reliable to ensure that a second call is not made, without just throwing.
+        //Note that the test will succeed, but the test run will fail:
+        NSString* message = [NSString stringWithFormat:@"Duplicate calling of the complition callback at %@(%d)", file, line];
+        @throw [NSException exceptionWithName:NSInternalInconsistencyException reason:message userInfo:nil];
+    }
+}
+
 
 @end

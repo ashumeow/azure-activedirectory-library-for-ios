@@ -53,10 +53,10 @@ static volatile int sDialogInProgress = 0;
 //A wrapper around checkAndHandleBadArgument. Assumes that "completionMethod" is in scope:
 #define HANDLE_ARGUMENT(ARG) \
 if (![self checkAndHandleBadArgument:ARG \
-argumentName:TO_NSSTRING(#ARG) \
-completionBlock:completionBlock]) \
+                        argumentName:TO_NSSTRING(#ARG) \
+                     completionBlock:completionBlock]) \
 { \
-return; \
+     return; \
 }
 
 /*! Verifies that the string parameter is not nil or empty. If it is,
@@ -71,7 +71,7 @@ return; \
     if ([NSString isStringNilOrBlank:argumentValue])
     {
         ADAuthenticationError* argumentError = [ADAuthenticationError errorFromArgument:argumentValue argumentName:argumentName];
-        ADAuthenticationResult* result = [ADAuthenticationResult resultFromError:argumentError];
+        ADAuthenticationResult* result = [ADAuthenticationResult resultFromError:argumentError correlationId:self.correlationId];
         completionBlock(result);//Call the callback to tell about the result
         return NO;
     }
@@ -81,57 +81,14 @@ return; \
     }
 }
 
-+(NSString*) canonicalizeAuthority: (NSString*) authority
-{
-    if ([NSString isStringNilOrBlank:authority])
-    {
-        return nil;
-    }
-    
-    NSString* trimmedAuthority = [[authority trimmedString] lowercaseString];
-    //Start with the trailing slash to ensure that the function covers "<authority>/authorize/" case.
-    if ( [trimmedAuthority hasSuffix:@"/" ] )//Remove trailing slash
-    {
-        trimmedAuthority = [trimmedAuthority substringToIndex:trimmedAuthority.length - 1];
-    }
-    
-    NSURL* url = [NSURL URLWithString:trimmedAuthority];
-    if (!url)
-    {
-        NSString* message = [NSString stringWithFormat:@"Authority %@", authority];
-        AD_LOG_WARN(@"The authority is not a valid URL", message);
-        return nil;
-    }
-    NSString* scheme = url.scheme;
-    if (![scheme isEqualToString:@"https"])
-    {
-        NSString* message = [NSString stringWithFormat:@"Authority %@", authority];
-        AD_LOG_WARN(@"Non HTTPS protocol for the authority", message);
-        return nil;
-    }
-    
-    // Final step is trimming any trailing /authorize or /token from the URL
-    // to get to the base URL for the authorization server. After that, we
-    // append either /authorize or /token dependent on the request that
-    // is being made to the server.
-    if ( [trimmedAuthority hasSuffix:OAUTH2_AUTHORIZE_SUFFIX] )
-    {
-        trimmedAuthority = [trimmedAuthority substringToIndex:trimmedAuthority.length - OAUTH2_AUTHORIZE_SUFFIX.length];
-    }
-    else if ( [trimmedAuthority hasSuffix:OAUTH2_TOKEN_SUFFIX] )
-    {
-        trimmedAuthority = [trimmedAuthority substringToIndex:trimmedAuthority.length - OAUTH2_TOKEN_SUFFIX.length];
-    }
-    
-    return trimmedAuthority;
-}
 
--(id) initInternalWithAuthority: (NSString*) authority
-              validateAuthority: (BOOL)bValidate
-                tokenCacheStore: (id<ADTokenCacheStoring>)tokenCache
-                          error: (ADAuthenticationError* __autoreleasing *) error
+-(id) initWithAuthority: (NSString*) authority
+      validateAuthority: (BOOL)bValidate
+        tokenCacheStore: (id<ADTokenCacheStoring>)tokenCache
+                  error: (ADAuthenticationError* __autoreleasing *) error
 {
-    NSString* extractedAuthority = [self.class canonicalizeAuthority:authority];
+    API_ENTRY;
+    NSString* extractedAuthority = [ADInstanceDiscovery canonicalizeAuthority:authority];
     RETURN_ON_INVALID_ARGUMENT(!extractedAuthority, authority, nil);
     
     self = [super init];
@@ -145,207 +102,393 @@ return; \
 }
 
 
-+(ADAuthenticationContext*) contextWithAuthority: (NSString*) authority
-                                           error: (ADAuthenticationError* __autoreleasing *) error
++(ADAuthenticationContext*) authenticationContextWithAuthority: (NSString*) authority
+                                                         error: (ADAuthenticationError* __autoreleasing *) error
 {
     API_ENTRY;
-    return [self contextWithAuthority: authority
-                    validateAuthority: YES
-                      tokenCacheStore: [ADDefaultTokenCacheStore sharedInstance]
-                                error: error];
+    return [self authenticationContextWithAuthority: authority
+                                  validateAuthority: YES
+                                    tokenCacheStore: [ADDefaultTokenCacheStore sharedInstance]
+                                              error: error];
 }
 
-+(ADAuthenticationContext*) contextWithAuthority: (NSString*) authority
-                               validateAuthority: (BOOL) bValidate
-                                           error: (ADAuthenticationError* __autoreleasing *) error
++(ADAuthenticationContext*) authenticationContextWithAuthority: (NSString*) authority
+                                             validateAuthority: (BOOL) bValidate
+                                                         error: (ADAuthenticationError* __autoreleasing *) error
 {
     API_ENTRY
-    return [self contextWithAuthority: authority
-                    validateAuthority: bValidate
-                      tokenCacheStore: [ADDefaultTokenCacheStore sharedInstance]
-                                error: error];
+    return [self authenticationContextWithAuthority: authority
+                                  validateAuthority: bValidate
+                                    tokenCacheStore: [ADDefaultTokenCacheStore sharedInstance]
+                                              error: error];
 }
 
-+(ADAuthenticationContext*) contextWithAuthority: (NSString*) authority
-                                 tokenCacheStore: (id<ADTokenCacheStoring>) tokenCache
-                                           error: (ADAuthenticationError* __autoreleasing *) error
++(ADAuthenticationContext*) authenticationContextWithAuthority: (NSString*) authority
+                                               tokenCacheStore: (id<ADTokenCacheStoring>) tokenCache
+                                                         error: (ADAuthenticationError* __autoreleasing *) error
 {
     API_ENTRY;
-    return [self contextWithAuthority:authority
-                    validateAuthority:YES
-                      tokenCacheStore:tokenCache
-                                error:error];
+    return [self authenticationContextWithAuthority:authority
+                                  validateAuthority:YES
+                                    tokenCacheStore:tokenCache
+                                              error:error];
 }
 
-+(ADAuthenticationContext*) contextWithAuthority: (NSString*) authority
-                               validateAuthority: (BOOL)bValidate
-                                 tokenCacheStore: (id<ADTokenCacheStoring>)tokenCache
-                                           error: (ADAuthenticationError* __autoreleasing *) error
++(ADAuthenticationContext*) authenticationContextWithAuthority: (NSString*) authority
+                                             validateAuthority: (BOOL)bValidate
+                                               tokenCacheStore: (id<ADTokenCacheStoring>)tokenCache
+                                                         error: (ADAuthenticationError* __autoreleasing *) error
 {
     API_ENTRY;
     RETURN_NIL_ON_NIL_EMPTY_ARGUMENT(authority);
     
-    ADAuthenticationContext* context = [self alloc];
-    if (context)
-    {
-        return [context initInternalWithAuthority: authority
-                                validateAuthority: bValidate
-                                  tokenCacheStore: tokenCache
-                                            error: error];
-    }
-    return context;
+
+    return [[self alloc] initWithAuthority: authority
+                         validateAuthority: bValidate
+                           tokenCacheStore: tokenCache
+                                     error: error];
 }
 
 
--(void) acquireToken: (NSString*) resource
-            clientId: (NSString*) clientId
-         redirectUri: (NSURL*) redirectUri
-     completionBlock: (ADAuthenticationCallback) completionBlock
+-(void) acquireTokenWithResource: (NSString*) resource
+                        clientId: (NSString*) clientId
+                     redirectUri: (NSURL*) redirectUri
+                 completionBlock: (ADAuthenticationCallback) completionBlock
 {
     API_ENTRY;
-    return [self internalAcquireToken:resource
-                             clientId:clientId
-                          redirectUri:redirectUri
-                       promptBehavior:AD_PROMPT_AUTO
-                               userId:nil
-                                scope:nil
-                 extraQueryParameters:nil
-                      completionBlock:completionBlock];
+    return [self internalAcquireTokenWithResource:resource
+                                         clientId:clientId
+                                      redirectUri:redirectUri
+                                   promptBehavior:AD_PROMPT_AUTO
+                                           userId:nil
+                                            scope:nil
+                             extraQueryParameters:nil
+                                         tryCache:YES
+                                validateAuthority:self.validateAuthority
+                                  completionBlock:completionBlock];
 }
 
--(void) acquireToken: (NSString*) resource
-            clientId: (NSString*) clientId
-         redirectUri: (NSURL*) redirectUri
-              userId: (NSString*) userId
-     completionBlock: (ADAuthenticationCallback) completionBlock
+-(void) acquireTokenWithResource: (NSString*) resource
+                        clientId: (NSString*) clientId
+                     redirectUri: (NSURL*) redirectUri
+                          userId: (NSString*) userId
+                 completionBlock: (ADAuthenticationCallback) completionBlock
 {
     API_ENTRY;
-    [self internalAcquireToken:resource
-                      clientId:clientId
-                   redirectUri:redirectUri
-                promptBehavior:AD_PROMPT_AUTO
-                        userId:userId
-                         scope:nil
-          extraQueryParameters:nil
-               completionBlock:completionBlock];
+    [self internalAcquireTokenWithResource:resource
+                                  clientId:clientId
+                               redirectUri:redirectUri
+                            promptBehavior:AD_PROMPT_AUTO
+                                    userId:userId
+                                     scope:nil
+                      extraQueryParameters:nil
+                                  tryCache:YES
+                         validateAuthority:self.validateAuthority
+                           completionBlock:completionBlock];
 }
 
 
--(void) acquireToken: (NSString*) resource
-            clientId: (NSString*)clientId
-         redirectUri: (NSURL*) redirectUri
-              userId: (NSString*) userId
-extraQueryParameters: (NSString*) queryParams
-     completionBlock: (ADAuthenticationCallback) completionBlock
+-(void) acquireTokenWithResource: (NSString*) resource
+                        clientId: (NSString*)clientId
+                     redirectUri: (NSURL*) redirectUri
+                          userId: (NSString*) userId
+            extraQueryParameters: (NSString*) queryParams
+                 completionBlock: (ADAuthenticationCallback) completionBlock
 {
     API_ENTRY;
-    [self internalAcquireToken:resource
-                      clientId:clientId
-                   redirectUri:redirectUri
-                promptBehavior:AD_PROMPT_AUTO
-                        userId:userId
-                         scope:nil
-          extraQueryParameters:queryParams
-               completionBlock:completionBlock];
+    [self internalAcquireTokenWithResource:resource
+                                  clientId:clientId
+                               redirectUri:redirectUri
+                            promptBehavior:AD_PROMPT_AUTO
+                                    userId:userId
+                                     scope:nil
+                      extraQueryParameters:queryParams
+                                  tryCache:YES
+                         validateAuthority:self.validateAuthority
+                           completionBlock:completionBlock];
+}
+
+//Returns YES if we shouldn't attempt other means to get access token.
+//
+-(BOOL) isFinalResult: (ADAuthenticationResult*) result
+{
+    return (AD_SUCCEEDED == result.status) /* access token provided, no need to try anything else */
+    || (result.error && !result.error.protocolCode); //Connection is down, server is unreachable or DNS error. No need to try refresh tokens.
 }
 
 /*Attemps to use the cache. Returns YES if an attempt was successful or if an
  internal asynchronous call will proceed the processing. */
--(BOOL) tryRefreshingFromCacheItem: (ADTokenCacheStoreItem*) item
-                               key: (ADTokenCacheStoreKey*) key
-                          resource: (NSString*) resource
-                          clientId: (NSString*) clientId
-                       redirectUri: (NSURL*) redirectUri
-                    promptBehavior: (ADPromptBehavior) promptBehavior
-                            userId: (NSString*) userId
-              extraQueryParameters: (NSString*) queryParams
-                   completionBlock: (ADAuthenticationCallback)completionBlock
+-(void) attemptToUseCacheItem: (ADTokenCacheStoreItem*) item
+               useAccessToken: (BOOL) useAccessToken
+                     resource: (NSString*) resource
+                     clientId: (NSString*) clientId
+                  redirectUri: (NSURL*) redirectUri
+               promptBehavior: (ADPromptBehavior) promptBehavior
+                       userId: (NSString*) userId
+         extraQueryParameters: (NSString*) queryParams
+              completionBlock: (ADAuthenticationCallback)completionBlock
 {
     //All of these should be set before calling this method:
     THROW_ON_NIL_ARGUMENT(item);
-    THROW_ON_NIL_ARGUMENT(key);
     THROW_ON_NIL_EMPTY_ARGUMENT(resource);
     THROW_ON_NIL_EMPTY_ARGUMENT(clientId);
+    THROW_ON_NIL_ARGUMENT(completionBlock);
     
-    if (!item.isExpired)
+    if (useAccessToken)
     {
-        //We have an cache item that can be used directly:
-        ADAuthenticationResult* result = [ADAuthenticationResult resultFromTokenCacheStoreItem:item];
+        //Access token is good, just use it:
+        ADAuthenticationResult* result = [ADAuthenticationResult resultFromTokenCacheStoreItem:item multiResourceRefreshToken:NO correlationId:nil];
         completionBlock(result);
-        return YES;
+        return;
     }
     
-    if (![NSString isStringNilOrBlank:item.refreshToken])
+    if ([NSString isStringNilOrBlank:item.refreshToken])
     {
-        //Expired, but we can use a refresh token. Please note that the call below will remove the item from
-        //the cache if the refresh token could not be used:
-        [self internalAcquireTokenByRefreshToken:item.refreshToken
-                                        clientId:clientId
+        completionBlock([ADAuthenticationResult resultFromError:
+                         [ADAuthenticationError unexpectedInternalError:@"Attempting to use an item without refresh token."]
+                                                  correlationId:self.correlationId]);
+        return;
+    }
+    
+    //Now attempt to use the refresh token of the passed cache item:
+    [self internalAcquireTokenByRefreshToken:item.refreshToken
+                                    clientId:clientId
+                                    resource:resource
+                                      userId:item.userInformation.userId
+                                   cacheItem:item
+                           validateAuthority:NO /* Done by the caller. */
+                             completionBlock:^(ADAuthenticationResult *result)
+     {
+         //Asynchronous block:
+         if ([self isFinalResult:result])
+         {
+             completionBlock(result);
+             return;
+         }
+         
+         //Try other means of getting access token result:
+         if (!item.multiResourceRefreshToken)//Try multi-resource refresh token if not currently trying it
+         {
+             ADTokenCacheStoreKey* broadKey = [ADTokenCacheStoreKey keyWithAuthority:self.authority resource:nil clientId:clientId error:nil];
+             if (broadKey)
+             {
+                 BOOL useAccessToken;
+                 ADAuthenticationError* error;
+                 ADTokenCacheStoreItem* broadItem = [self findCacheItemWithKey:broadKey userId:userId useAccessToken:&useAccessToken error:&error];
+                 if (error)
+                 {
+                     completionBlock([ADAuthenticationResult resultFromError:error correlationId:self.correlationId]);
+                     return;
+                 }
+                 
+                 if (broadItem)
+                 {
+                     if (!broadItem.multiResourceRefreshToken)
+                     {
+                         AD_LOG_WARN(@"Unexpected", @"Multi-resource refresh token expected here.");
+                         //Recover (avoid infinite recursion):
+                         completionBlock(result);
+                         return;
+                     }
+                     
+                     //Call recursively with the cache item containing a multi-resource refresh token:
+                     [self attemptToUseCacheItem:broadItem
+                                  useAccessToken:NO
                                         resource:resource
-                                          userId:item.userInformation.userId
-                                       cacheItem:item
-                                 completionBlock:^(ADAuthenticationResult *result) {
-                                     //The code in the block will execute asynchronously:
-                                     if (result.error && AD_ERROR_INVALID_REFRESH_TOKEN == result.error.code)
-                                     {
-                                         //The access token has expired and the refresh token is invalid.
-                                         //Remove the cache item and call recursively acquireToken to
-                                         //reauthenticate the user:
-                                         [self internalAcquireToken: resource
-                                                           clientId: clientId
-                                                        redirectUri: redirectUri
-                                                     promptBehavior: promptBehavior
-                                                             userId: userId
-                                                              scope: nil
-                                               extraQueryParameters: queryParams
-                                                    completionBlock: completionBlock];
-                                         
-                                         return;//Make sure that the completion block is not called, as the acquireToken above will call it.
-                                     }
-                                     
-                                     //The mandatory completion block callback:
-                                     completionBlock(result);
-                                 }];//End of the refreshing token completion block, executed asynchronously.
-        return YES;//The asynchronous block handles the next steps.
-    }
-    else
-    {
-        //Expired and no refresh token - remove it from the cache:
-        [self.tokenCacheStore removeItemWithKey:key userId:item.userInformation.userId];
-        return NO;//The caller will need to take care of the token
-    }
+                                        clientId:clientId
+                                     redirectUri:redirectUri
+                                  promptBehavior:promptBehavior
+                                          userId:userId
+                            extraQueryParameters:queryParams
+                                 completionBlock:completionBlock];
+                     return;//The call above takes over, no more processing
+                 }//broad item
+             }//key
+         }//!item.multiResourceRefreshToken
+         
+         //The refresh token attempt failed and no other suitable refresh token found
+         //call acquireToken
+         [self internalAcquireTokenWithResource: resource
+                                       clientId: clientId
+                                    redirectUri: redirectUri
+                                 promptBehavior: promptBehavior
+                                         userId: userId
+                                          scope: nil
+                           extraQueryParameters: queryParams
+                                       tryCache: NO
+                              validateAuthority: NO
+                                completionBlock: completionBlock];
+    }];//End of the refreshing token completion block, executed asynchronously.
 }
 
--(void) acquireToken: (NSString*) resource
-            clientId: (NSString*) clientId
-         redirectUri: (NSURL*) redirectUri
-      promptBehavior: (ADPromptBehavior) promptBehavior
-              userId: (NSString*) userId
-extraQueryParameters: (NSString*) queryParams
-     completionBlock: (ADAuthenticationCallback)completionBlock
+-(void) acquireTokenWithResource: (NSString*) resource
+                        clientId: (NSString*) clientId
+                     redirectUri: (NSURL*) redirectUri
+                  promptBehavior: (ADPromptBehavior) promptBehavior
+                          userId: (NSString*) userId
+            extraQueryParameters: (NSString*) queryParams
+                 completionBlock: (ADAuthenticationCallback)completionBlock
 {
     API_ENTRY;
     THROW_ON_NIL_ARGUMENT(completionBlock);//The only argument that throws
-    [self internalAcquireToken:resource
-                      clientId:clientId
-                   redirectUri:redirectUri
-                promptBehavior:promptBehavior
-                        userId:userId
-                         scope:nil
-          extraQueryParameters:queryParams
-               completionBlock:completionBlock];
+    [self internalAcquireTokenWithResource:resource
+                                  clientId:clientId
+                               redirectUri:redirectUri
+                            promptBehavior:promptBehavior
+                                    userId:userId
+                                     scope:nil
+                      extraQueryParameters:queryParams
+                                  tryCache:YES
+                         validateAuthority:self.validateAuthority
+                           completionBlock:completionBlock];
 }
 
--(void) internalAcquireToken: (NSString*) resource
-                    clientId: (NSString*) clientId
-                 redirectUri: (NSURL*) redirectUri
-              promptBehavior: (ADPromptBehavior) promptBehavior
-                      userId: (NSString*) userId
-                       scope: (NSString*) scope
-        extraQueryParameters: (NSString*) queryParams
-             completionBlock: (ADAuthenticationCallback)completionBlock
+//Gets an item from the cache, where userId may be nil. Raises error, if items for multiple users are present
+//and user id is not specified.
+-(ADTokenCacheStoreItem*) extractCacheItemWithKey: (ADTokenCacheStoreKey*) key
+                                           userId: (NSString*) userId
+                                            error: (ADAuthenticationError* __autoreleasing*) error
+{
+    if (!key || !self.tokenCacheStore)
+    {
+        return nil;//Nothing to return
+    }
+    
+    ADTokenCacheStoreItem* extractedItem = nil;
+    if (![NSString isStringNilOrBlank:userId])
+    {
+        extractedItem = [self.tokenCacheStore getItemWithKey:key userId:userId];
+    }
+    else
+    {
+        //No userId, check the cache for tokens for all users:
+        NSArray* items = [self.tokenCacheStore getItemsWithKey:key];
+        if (items.count > 1)
+        {
+            //More than one user token available in the cache, raise error to tell the developer to denote the desired user:
+            ADAuthenticationError* adError  = [ADAuthenticationError errorFromAuthenticationError:AD_ERROR_MULTIPLE_USERS
+                                                                                     protocolCode:nil
+                                                                                     errorDetails:multiUserError];
+            if (error)
+            {
+                *error = adError;
+            }
+            return nil;
+        }
+        else if (items.count == 1)
+        {
+            extractedItem = [items objectAtIndex:0];//Exactly one - just use it.
+        }
+    }
+    return extractedItem;
+}
+
+//Checks the cache for item that can be used to get directly or indirectly an access token.
+//Checks the multi-resource refresh tokens too.
+-(ADTokenCacheStoreItem*) findCacheItemWithKey: (ADTokenCacheStoreKey*) key
+                                        userId: (NSString*) userId
+                                useAccessToken: (BOOL*) useAccessToken
+                                         error: (ADAuthenticationError* __autoreleasing*) error
+{
+    if (!key || !self.tokenCacheStore)
+    {
+        return nil;//Nothing to return
+    }
+    ADAuthenticationError* localError;
+    ADTokenCacheStoreItem* item = [self extractCacheItemWithKey:key userId:userId error:&localError];
+    if (localError)
+    {
+        if (error)
+        {
+            *error = localError;
+        }
+        return nil;//Quick return if an error was detected.
+    }
+    
+    if (item)
+    {
+        *useAccessToken = item.accessToken && !item.isExpired;
+        if (*useAccessToken)
+        {
+            return item;
+        }
+        else if (![NSString isStringNilOrBlank:item.refreshToken])
+        {
+            return item;//Suitable direct refresh token found.
+        }
+        else
+        {
+            //We have a cache item that cannot be used anymore, remove it from the cache:
+            [self.tokenCacheStore removeItemWithKey:key userId:userId];
+        }
+    }
+    *useAccessToken = false;//No item with suitable access token exists
+    
+    if (![NSString isStringNilOrBlank:key.resource])
+    {
+        //The request came for specific resource. Try returning a multi-resource refresh token:
+        ADTokenCacheStoreKey* broadKey = [ADTokenCacheStoreKey keyWithAuthority:self.authority
+                                                                       resource:nil
+                                                                       clientId:key.clientId
+                                                                          error:&localError];
+        if (!broadKey)
+        {
+            AD_LOG_WARN(@"Unexped error", localError.errorDetails);
+            return nil;//Recover
+        }
+        ADTokenCacheStoreItem* broadItem = [self extractCacheItemWithKey:broadKey userId:userId error:&localError];
+        if (localError)
+        {
+            if (error)
+            {
+                *error = localError;
+            }
+            return nil;
+        }
+        return broadItem;
+    }
+    return nil;//Nothing suitable
+}
+
+-(void) internalAcquireTokenWithResource: (NSString*) resource
+                                clientId: (NSString*) clientId
+                             redirectUri: (NSURL*) redirectUri
+                          promptBehavior: (ADPromptBehavior) promptBehavior
+                                  userId: (NSString*) userId
+                                   scope: (NSString*) scope
+                    extraQueryParameters: (NSString*) queryParams
+                                tryCache: (BOOL) tryCache /* set internally to avoid infinite recursion */
+                       validateAuthority: (BOOL) validateAuthority
+                         completionBlock: (ADAuthenticationCallback)completionBlock
 {
     THROW_ON_NIL_ARGUMENT(completionBlock);
+    HANDLE_ARGUMENT(resource);
+    
+    if (validateAuthority)
+    {
+        [[ADInstanceDiscovery sharedInstance] validateAuthority:self.authority completionBlock:^(BOOL validated, ADAuthenticationError *error)
+        {
+            if (error)
+            {
+                completionBlock([ADAuthenticationResult resultFromError:error correlationId:self.correlationId]);
+            }
+            else
+            {
+                [self internalAcquireTokenWithResource:resource
+                                              clientId:clientId
+                                           redirectUri:redirectUri
+                                        promptBehavior:promptBehavior
+                                                userId:userId
+                                                 scope:scope
+                                  extraQueryParameters:queryParams
+                                              tryCache:tryCache
+                                     validateAuthority:NO /* Already validated in this block. */
+                                       completionBlock:completionBlock];
+            }
+        }];
+        return;//The asynchronous handler above will do the work.
+    }
+
     //Check the cache:
     ADAuthenticationError* error;
     //We are explicitly creating a key first to ensure indirectly that all of the required arguments are correct.
@@ -354,53 +497,35 @@ extraQueryParameters: (NSString*) queryParams
     if (!key)
     {
         //If the key cannot be extracted, call the callback with the information:
-        ADAuthenticationResult* result = [ADAuthenticationResult resultFromError:error];
+        ADAuthenticationResult* result = [ADAuthenticationResult resultFromError:error correlationId:self.correlationId];
         completionBlock(result);
         return;
     }
     
-    if (promptBehavior != AD_PROMPT_ALWAYS && self.tokenCacheStore)
+    if (tryCache && promptBehavior != AD_PROMPT_ALWAYS && self.tokenCacheStore)
     {
         //Cache should be used in this case:
-        ADTokenCacheStoreItem* item = nil;
-        if (!userId)
+        BOOL accessTokenUsable;
+        ADTokenCacheStoreItem* cacheItem = [self findCacheItemWithKey:key userId:userId useAccessToken:&accessTokenUsable error:&error];
+        if (error)
         {
-            //Null passed, check the cache for tokens for all users:
-            NSArray* items = [self.tokenCacheStore getItemsWithKey:key];
-            if (items.count > 1)
-            {
-                //More than one user token available in the cache, raise error to tell the developer to denote the desired user:
-                ADAuthenticationError* error  = [ADAuthenticationError errorFromAuthenticationError:AD_ERROR_MULTIPLE_USERS
-                                                                                       protocolCode:nil
-                                                                                       errorDetails:multiUserError];
-                completionBlock([ADAuthenticationResult resultFromError:error]);
-                return;
-            }
-            else if (items.count == 1)
-            {
-                item = [items objectAtIndex:0];//Exactly one - just use it.
-            }
-        }
-        else
-        {
-            item = [self.tokenCacheStore getItemWithKey:key userId:userId];//Pass the userId to the cache if supplied
+            completionBlock([ADAuthenticationResult resultFromError:error correlationId:self.correlationId]);
+            return;
         }
         
-        if (nil != item)
+        if (cacheItem)
         {
             //Found a promising item in the cache, try using it:
-            if ([self tryRefreshingFromCacheItem:item
-                                             key:key
-                                        resource:resource
-                                        clientId:clientId
-                                     redirectUri:redirectUri
-                                  promptBehavior:promptBehavior
-                                          userId:userId
-                            extraQueryParameters:queryParams
-                                 completionBlock:completionBlock])
-            {
-                return; //The tryRefreshingFromCacheItem has taken care of the token obtaining
-            }
+            [self attemptToUseCacheItem:cacheItem
+                         useAccessToken:accessTokenUsable
+                               resource:resource
+                               clientId:clientId
+                            redirectUri:redirectUri
+                         promptBehavior:promptBehavior
+                                 userId:userId
+                   extraQueryParameters:queryParams
+                        completionBlock:completionBlock];
+            return; //The tryRefreshingFromCacheItem has taken care of the token obtaining
         }
     }
     
@@ -412,15 +537,12 @@ extraQueryParameters: (NSString*) queryParams
         [ADAuthenticationError errorFromAuthenticationError:AD_ERROR_USER_INPUT_NEEDED
                                                protocolCode:nil
                                                errorDetails:credentialsNeeded];
-        ADAuthenticationResult* result = [ADAuthenticationResult resultFromError:error];
+        ADAuthenticationResult* result = [ADAuthenticationResult resultFromError:error correlationId:self.correlationId];
         completionBlock(result);
         return;
     }
     
-    //The current IPAL implementation uses NSURLConnection, which calls its delegate on the same thread
-    //that created the object. Unfortunately with Grand Central Dispatch, it is not guaranteed that the thread
-    //exists. Hence for now, the create the connection on the main thread:
-    dispatch_async(dispatch_get_main_queue(), ^
+    dispatch_async([ADAuthenticationSettings sharedInstance].dispatchQueue, ^
                    {
                        //Get the code first:
                        [self requestCodeByResource:resource
@@ -430,11 +552,14 @@ extraQueryParameters: (NSString*) queryParams
                                             userId:userId
                                            webView:self.webView
                                     promptBehavior:promptBehavior
+                              extraQueryParameters:queryParams
                                         completion:^(NSString * code, ADAuthenticationError *error)
                         {
                             if (error)
                             {
-                                completionBlock([ADAuthenticationResult resultFromError:error]);
+                                ADAuthenticationResult* result = (AD_ERROR_USER_CANCEL == error.code) ? [ADAuthenticationResult resultFromCancellation]
+                                : [ADAuthenticationResult resultFromError:error correlationId:self.correlationId];
+                                completionBlock(result);
                             }
                             else
                             {
@@ -447,7 +572,7 @@ extraQueryParameters: (NSString*) queryParams
                                  {
                                      if (AD_SUCCEEDED == result.status)
                                      {
-                                         [self.tokenCacheStore addOrUpdateItem:result.tokenCacheStoreItem error:nil];
+                                         [self updateCacheToResult:result cacheItem:nil withRefreshToken:nil];
                                      }
                                      completionBlock(result);
                                  }];
@@ -466,6 +591,7 @@ extraQueryParameters: (NSString*) queryParams
                                     resource:nil
                                       userId:nil
                                    cacheItem:nil
+                           validateAuthority:self.validateAuthority
                              completionBlock:completionBlock];
 }
 
@@ -480,7 +606,87 @@ extraQueryParameters: (NSString*) queryParams
                                     resource:resource
                                       userId:nil
                                    cacheItem:nil
+                           validateAuthority:self.validateAuthority
                              completionBlock:completionBlock];
+}
+
+//Stores the result in the cache. cacheItem parameter may be nil, if the result is successfull and contains
+//the item to be stored.
+-(void) updateCacheToResult: (ADAuthenticationResult*) result
+                  cacheItem: (ADTokenCacheStoreItem*) cacheItem
+           withRefreshToken: (NSString*) refreshToken
+{
+    THROW_ON_NIL_ARGUMENT(result);
+    
+    if (!self.tokenCacheStore)
+        return;//No cache to update
+
+    if (AD_SUCCEEDED == result.status)
+    {
+        THROW_ON_NIL_ARGUMENT(result.tokenCacheStoreItem);
+        THROW_ON_NIL_EMPTY_ARGUMENT(result.tokenCacheStoreItem.resource);
+        THROW_ON_NIL_EMPTY_ARGUMENT(result.tokenCacheStoreItem.accessToken);
+
+        //In case of success we use explicitly the item that comes back in the result:
+        cacheItem = result.tokenCacheStoreItem;
+        if (result.multiResourceRefreshToken)
+        {
+            AD_LOG_VERBOSE_F(@"Token cache store", @"Storing multi-resource refresh token for authority: %@", self.authority);
+            
+            //If the server returned a multi-resource refresh token, we break
+            //the item into two: one with the access token and no refresh token and
+            //another one with the broad refresh token and no access token and no resource.
+            //This breaking is useful for further updates on the cache and quick lookups
+            ADTokenCacheStoreItem* multiRefreshTokenItem = [cacheItem copy];
+            cacheItem.refreshToken = nil;
+            
+            multiRefreshTokenItem.accessToken = nil;
+            multiRefreshTokenItem.resource = nil;
+            multiRefreshTokenItem.expiresOn = nil;
+            [self.tokenCacheStore addOrUpdateItem:multiRefreshTokenItem error:nil];
+        }
+        
+        AD_LOG_VERBOSE_F(@"Token cache store", @"Storing access token for resource: %@", cacheItem.resource);
+        [self.tokenCacheStore addOrUpdateItem:cacheItem error:nil];
+    }
+    else
+    {
+        if (AD_ERROR_INVALID_REFRESH_TOKEN == result.error.code)
+        {//Bad refresh token. Remove it from the cache:
+            THROW_ON_NIL_ARGUMENT(cacheItem);
+            THROW_ON_NIL_EMPTY_ARGUMENT(cacheItem.resource);
+            THROW_ON_NIL_EMPTY_ARGUMENT(refreshToken);
+            
+            BOOL removed = NO;
+            //The refresh token didn't work. We need to clear this refresh item from the cache.
+            ADTokenCacheStoreKey* exactKey = [cacheItem extractKeyWithError:nil];
+            if (exactKey)
+            {
+                ADTokenCacheStoreItem* existing = [self.tokenCacheStore getItemWithKey:exactKey userId:cacheItem.userInformation.userId];
+                if ([refreshToken isEqualToString:existing.refreshToken])
+                {
+                    AD_LOG_VERBOSE_F(@"Token cache store", @"Removing cache for resource: %@", cacheItem.resource);
+                    [self.tokenCacheStore removeItemWithKey:exactKey userId:existing.userInformation.userId];
+                    removed = YES;
+                }
+            }
+            
+            if (!removed)
+            {
+                //Now try finding a broad refresh token in the cache and remove it accordingly
+                ADTokenCacheStoreKey* broadKey = [ADTokenCacheStoreKey keyWithAuthority:self.authority resource:nil clientId:cacheItem.clientId error:nil];
+                if (broadKey)
+                {
+                    ADTokenCacheStoreItem* broadItem = [self.tokenCacheStore getItemWithKey:broadKey userId:cacheItem.userInformation.userId];
+                    if (broadItem && [refreshToken isEqualToString:broadItem.refreshToken])
+                    {
+                        AD_LOG_VERBOSE_F(@"Token cache store", @"Removing multi-resource refresh token for authority: %@", self.authority);
+                        [self.tokenCacheStore removeItemWithKey:broadKey userId:cacheItem.userInformation.userId];
+                    }
+                }
+            }
+        }
+    }
 }
 
 //Obtains an access token from the passed refresh token. If "cacheItem" is passed, updates it with the additional
@@ -490,10 +696,35 @@ extraQueryParameters: (NSString*) queryParams
                                   resource: (NSString*) resource
                                     userId: (NSString*) userId
                                  cacheItem: (ADTokenCacheStoreItem*) cacheItem
+                         validateAuthority: (BOOL) validateAuthority
                            completionBlock: (ADAuthenticationCallback)completionBlock
 {
     HANDLE_ARGUMENT(refreshToken);
     HANDLE_ARGUMENT(clientId);
+
+    AD_LOG_VERBOSE_F(@"Attempting to acquire an access token from refresh token.", @"Resource: %@", resource);
+
+    if (validateAuthority)
+    {
+        [[ADInstanceDiscovery sharedInstance] validateAuthority:self.authority completionBlock:^(BOOL validated, ADAuthenticationError *error)
+         {
+             if (error)
+             {
+                 completionBlock([ADAuthenticationResult resultFromError:error correlationId:self.correlationId]);
+             }
+             else
+             {
+                 [self internalAcquireTokenByRefreshToken:refreshToken
+                                                 clientId:clientId
+                                                 resource:resource
+                                                   userId:userId
+                                                cacheItem:cacheItem
+                                        validateAuthority:NO /*Already validated in this block. */
+                                          completionBlock:completionBlock];
+             }
+         }];
+         return;//The asynchronous block above will handle everything;
+    }
     
     //Fill the data for the token refreshing:
     NSMutableDictionary *request_data = [NSMutableDictionary dictionaryWithObjectsAndKeys:
@@ -513,44 +744,30 @@ extraQueryParameters: (NSString*) queryParams
         [request_data setObject:[ADAuthenticationSettings sharedInstance].platformId forKey:@"platform_id"];
     }
     
-    //The current IPAL implementation uses NSURLConnection, which calls its delegate on the same thread
-    //that created the object. Unfortunately with Grand Central Dispatch, it is not guaranteed that the thread
-    //exists. Hence for now, the create the connection on the main thread:
-    dispatch_async(dispatch_get_main_queue(), ^
+    dispatch_async([ADAuthenticationSettings sharedInstance].dispatchQueue, ^
                    {
-                       NSString* log = [NSString stringWithFormat:@"Client id: '%@'; resource: '%@'; user:'%@'", clientId, resource, userId];
-                       AD_LOG_INFO(@"Sending request for refreshing token.", log);
-                       [self request:self.authority requestData:request_data completion:^(NSDictionary *response)
+                       AD_LOG_INFO_F(@"Sending request for refreshing token.", @"Client id: '%@'; resource: '%@'; user:'%@'", clientId, resource, userId);
+                       NSUUID* requestId = [self getRequestCorrelationId];
+                       [self request:self.authority
+                         requestData:request_data
+                        requestCorrelationId:requestId
+                          completion:^(NSDictionary *response)
                         {
-                            ADTokenCacheStoreItem* resultItem;
-                            if (cacheItem)
-                            {
-                                resultItem = cacheItem;
-                            }
-                            else
-                            {
-                                resultItem = [ADTokenCacheStoreItem new];
-                                resultItem.resource = resource;
-                                resultItem.clientId = clientId;
-                                resultItem.authority = self.authority;
-                            }
+                            ADTokenCacheStoreItem* resultItem = (cacheItem) ? cacheItem : [ADTokenCacheStoreItem new];
                             
-                            ADAuthenticationResult *result = [self processTokenResponse:response forItem:resultItem fromRefresh:YES];
+                            //Always ensure that the cache item has all of these set, especially in the broad token case, where the passed item
+                            //may have empty "resource" property:
+                            resultItem.resource = resource;
+                            resultItem.clientId = clientId;
+                            resultItem.authority = self.authority;
+                            
+                            
+                            ADAuthenticationResult *result = [self processTokenResponse:response forItem:resultItem fromRefresh:YES requestCorrelationId:requestId];
                             if (cacheItem)//The request came from the cache item, update it:
                             {
-                                ADTokenCacheStoreKey* key = [cacheItem extractKeyWithError:nil];
-                                if (key)
-                                {
-                                    if (AD_SUCCEEDED == result.status)
-                                    {
-                                        [self.tokenCacheStore addOrUpdateItem:cacheItem error:nil];
-                                    }
-                                    else if (AD_ERROR_INVALID_REFRESH_TOKEN == result.error.code)
-                                    {
-                                        //Bad refresh token, just clear the cache:
-                                        [self.tokenCacheStore removeItemWithKey:key userId:cacheItem.userInformation.userId];
-                                    }
-                                }
+                                [self updateCacheToResult:result
+                                                cacheItem:resultItem
+                                         withRefreshToken:refreshToken];
                             }
                             
                             completionBlock(result);
@@ -562,17 +779,35 @@ extraQueryParameters: (NSString*) queryParams
 - (ADAuthenticationResult *)processTokenResponse: (NSDictionary *)response
                                          forItem: (ADTokenCacheStoreItem*)item
                                      fromRefresh: (BOOL) fromRefreshTokenWorkflow
+                            requestCorrelationId: (NSUUID*) requestCorrelationId
 {
     THROW_ON_NIL_ARGUMENT(response);
     THROW_ON_NIL_ARGUMENT(item);
-    ADAuthenticationError* error = [self protocolErrorFromDictionary:response errorCode:(fromRefreshTokenWorkflow) ? AD_ERROR_INVALID_REFRESH_TOKEN : AD_ERROR_AUTHENTICATION];
+    AD_LOG_VERBOSE(@"Token extraction", @"Attempt to extract the data from the server response.");
+    
+    NSString* responseId = [response objectForKey:OAUTH2_CORRELATION_ID];
+    NSUUID* responseUUID;
+    if (![NSString isStringNilOrBlank:responseId])
+    {
+        responseUUID = [[NSUUID alloc] initWithUUIDString:responseId];
+        if (!responseUUID)
+        {
+            AD_LOG_WARN_F(@"Bad correlation id", @"The received correlation id is not a valid UUID. Sent: %@; Received: %@", requestCorrelationId, responseId);
+        }
+        else if (![requestCorrelationId isEqual:responseUUID])
+        {
+            AD_LOG_WARN_F(@"Correlation id mismatch", @"Mismatch between the sent correlation id and the received one. Sent: %@; Received: %@", requestCorrelationId, responseId);
+        }
+    }
+    
+    ADAuthenticationError* error = [self errorFromDictionary:response errorCode:(fromRefreshTokenWorkflow) ? AD_ERROR_INVALID_REFRESH_TOKEN : AD_ERROR_AUTHENTICATION];
     if (error)
     {
-        return [ADAuthenticationResult resultFromError:error];
+        return [ADAuthenticationResult resultFromError:error correlationId:responseUUID];
     }
     
     NSString* accessToken = [response objectForKey:OAUTH2_ACCESS_TOKEN];
-    if (accessToken)
+    if (![NSString isStringNilOrBlank:accessToken])
     {
         item.authority = self.authority;
         item.accessToken = accessToken;
@@ -595,8 +830,7 @@ extraQueryParameters: (NSString*) queryParams
             }
             else
             {
-                NSString* log = [NSString stringWithFormat:@"The response value for the access token expiration cannot be parsed: %@", expires];
-                AD_LOG_WARN(@"Unparsable time", log);
+                AD_LOG_WARN_F(@"Unparsable time", @"The response value for the access token expiration cannot be parsed: %@", expires);
                 // Unparseable, use default value
                 expires = [NSDate dateWithTimeIntervalSinceNow:3600.0];//1 hour
             }
@@ -611,12 +845,29 @@ extraQueryParameters: (NSString*) queryParams
         item.expiresOn       = expires;
         item.refreshToken    = [response objectForKey:OAUTH2_REFRESH_TOKEN];
         NSString* resource   = [response objectForKey:OAUTH2_RESOURCE];
+        BOOL multiResourceRefreshToken = NO;
         if (![NSString isStringNilOrBlank:resource])
         {
-            item.resource = resource;
+            if (item.resource && ![item.resource isEqualToString:resource])
+            {
+                AD_LOG_WARN_F(@"Wrong resource returned by the server.", @"Expected resource: '%@'; Server returned: '%@'", item.resource, resource);
+            }
+            //Currently, if the server has returned a "resource" parameter and we have a refresh token,
+            //this token is a multi-resource refresh token:
+            multiResourceRefreshToken = ![NSString isStringNilOrBlank:item.refreshToken];
         }
         
-        return [ADAuthenticationResult resultFromTokenCacheStoreItem:item];
+        NSString* idToken = [response objectForKey:OAUTH2_ID_TOKEN];
+        if (idToken)
+        {
+            ADUserInformation* userInfo = [ADUserInformation userInformationWithIdToken:idToken error:nil];
+            if (userInfo)
+            {
+                item.userInformation = userInfo;
+            }
+        }
+        
+        return [ADAuthenticationResult resultFromTokenCacheStoreItem:item multiResourceRefreshToken:multiResourceRefreshToken correlationId:responseUUID];
     }
     
     //No access token and no error, we assume that there was another kind of error (connection, server down, etc.).
@@ -625,7 +876,7 @@ extraQueryParameters: (NSString*) queryParams
     error = [ADAuthenticationError errorFromAuthenticationError:AD_ERROR_AUTHENTICATION
                                                    protocolCode:nil
                                                    errorDetails:errorMessage];
-    return [ADAuthenticationResult resultFromError:error];
+    return [ADAuthenticationResult resultFromError:error correlationId:responseUUID];
 }
 
 //Ensures that a single UI login dialog can be requested at a time.
@@ -663,6 +914,7 @@ extraQueryParameters: (NSString*) queryParams
                               userId: (NSString*) userId
                          requestType: (NSString*) requestType
                       promptBehavior: (ADPromptBehavior) promptBehavior
+                extraQueryParameters: (NSString*) queryParams
 {
     NSString *state    = [self encodeProtocolStateWithResource:resource scope:scope];
     // Start the web navigation process for the Implicit grant profile.
@@ -687,30 +939,40 @@ extraQueryParameters: (NSString*) queryParams
         //Force the server to ignore cookies, by specifying explicitly the prompt behavior:
         startUrl = [startUrl stringByAppendingString:[NSString stringWithFormat:@"&prompt=login"]];
     }
+    if (![NSString isStringNilOrBlank:queryParams])
+    {//Append the additional query parameters if specified:
+        queryParams = queryParams.trimmedString;
+        
+        //Add the '&' for the additional params if not there already:
+        startUrl = [queryParams hasPrefix:@"&"] ? [startUrl stringByAppendingString:queryParams]
+                                                : [startUrl stringByAppendingString:[NSString stringWithFormat:@"&%@", queryParams]];
+    }
     
     return startUrl;
 }
 
 //Obtains a protocol error from the response:
--(ADAuthenticationError*) protocolErrorFromDictionary: (NSDictionary*) dictionary
-                                            errorCode: (ADErrorCode) errorCode
+-(ADAuthenticationError*) errorFromDictionary: (NSDictionary*) dictionary
+                                    errorCode: (ADErrorCode) errorCode
 {
-    ADAuthenticationError* error = nil;
+    //First check for explicit OAuth2 protocol error:
     NSString* serverOAuth2Error = [dictionary objectForKey:OAUTH2_ERROR];
     if (![NSString isStringNilOrBlank:serverOAuth2Error])
     {
+        NSString* errorDetails = [dictionary objectForKey:OAUTH2_ERROR_DESCRIPTION];
         // Error response from the server
-        error = [ADAuthenticationError errorFromAuthenticationError:errorCode
+        return [ADAuthenticationError errorFromAuthenticationError:errorCode
                                                        protocolCode:serverOAuth2Error
-                                                       errorDetails:[NSString stringWithFormat:serverError, serverOAuth2Error]];
+                                                       errorDetails:(errorDetails) ? errorDetails : [NSString stringWithFormat:serverError, serverOAuth2Error]];
     }
-    return error;
+    //In the case of more generic error, e.g. server unavailable, DNS error or no internet connection, the error object will be directly placed in the dictionary:
+    return [dictionary objectForKey:AUTH_NON_PROTOCOL_ERROR];
 }
 
 //Ensures that the state comes back in the response:
 -(BOOL) verifyStateFromDictionary: (NSDictionary*) dictionary
 {
-    NSDictionary *state = [self.class decodeProtocolState:[dictionary objectForKey:OAUTH2_STATE]];
+    NSDictionary *state = [NSDictionary URLFormDecode:[[dictionary objectForKey:OAUTH2_STATE] adBase64UrlDecode]];
     if (state.count != 0)
     {
         NSString *authorizationServer = [state objectForKey:@"a"];
@@ -718,13 +980,11 @@ extraQueryParameters: (NSString*) queryParams
         
         if (![NSString isStringNilOrBlank:authorizationServer] && ![NSString isStringNilOrBlank:resource])
         {
-            NSString* log = [NSString stringWithFormat:@"The authorization server returned the following state: %@", state];
-            AD_LOG_VERBOSE(@"State", log);
+            AD_LOG_VERBOSE_F(@"State", @"The authorization server returned the following state: %@", state);
             return YES;
         }
     }
-    NSString* log = [NSString stringWithFormat:@"Missing or invalid state returned: %@", state];
-    AD_LOG_WARN(@"State error", log);
+    AD_LOG_WARN_F(@"State error", @"Missing or invalid state returned: %@", state);
     return NO;
 }
 
@@ -736,9 +996,11 @@ extraQueryParameters: (NSString*) queryParams
                        userId: (NSString*) userId
                       webView: (WebViewType *) webView
                promptBehavior: (ADPromptBehavior) promptBehavior
+         extraQueryParameters: (NSString*) queryParams
                    completion: (ADAuthorizationCodeCallback) completionBlock
 {
     THROW_ON_NIL_ARGUMENT(completionBlock);
+    AD_LOG_VERBOSE_F(@"Requesting authorization code.", @"Requesting authorization code for resource: %@", resource);
     if (![self takeExclusionLockWithCallback:completionBlock])
     {
         return;
@@ -776,7 +1038,7 @@ extraQueryParameters: (NSString*) queryParams
              }
              
              //OAuth2 error may be passed by the server:
-             error = [self protocolErrorFromDictionary:parameters errorCode:AD_ERROR_AUTHENTICATION];
+             error = [self errorFromDictionary:parameters errorCode:AD_ERROR_AUTHENTICATION];
              if (!error)
              {
                  //Note that we do not enforce the state, just log it:
@@ -795,6 +1057,11 @@ extraQueryParameters: (NSString*) queryParams
      }];
 }
 
+//Returns a suitable correlation ID:
+-(NSUUID*) getRequestCorrelationId
+{
+    return self.correlationId ? self.correlationId : [NSUUID UUID];
+}
 
 // Generic OAuth2 Authorization Request, obtains a token from an authorization code.
 - (void)requestTokenByCode: (NSString *) code
@@ -805,6 +1072,7 @@ extraQueryParameters: (NSString*) queryParams
                 completion: (ADAuthenticationCallback) completionBlock
 {
     THROW_ON_NIL_EMPTY_ARGUMENT(code);
+    AD_LOG_VERBOSE_F(@"Requesting token from authorization code.", @"Requesting token by authorization code for resource: %@", resource);
     
     //Fill the data for the token refreshing:
     NSMutableDictionary *request_data = [NSMutableDictionary dictionaryWithObjectsAndKeys:
@@ -820,34 +1088,42 @@ extraQueryParameters: (NSString*) queryParams
         [request_data setObject:[ADAuthenticationSettings sharedInstance].platformId forKey:OAUTH2_PLATFORM_ID];
     }
     
-    [self request:self.authority requestData:request_data completion:^(NSDictionary *response) {
+    NSUUID* requestId = [self getRequestCorrelationId];
+    [self request:self.authority
+      requestData:request_data
+requestCorrelationId:requestId
+       completion:^(NSDictionary *response)
+    {
         //Prefill the known elements in the item. These can be overridden by the response:
         ADTokenCacheStoreItem* item = [ADTokenCacheStoreItem new];
         item.resource = resource;
         item.clientId = clientId;
-        completionBlock([self processTokenResponse:response forItem:item fromRefresh:NO]);
+        completionBlock([self processTokenResponse:response forItem:item fromRefresh:NO requestCorrelationId:requestId]);
     }];
 }
 
 // Performs an OAuth2 token request using the supplied request dictionary and executes the completion block
 // If the request generates an HTTP error, the method adds details to the "error" parameters of the dictionary.
-- (void)request:(NSString *)authorizationServer requestData:(NSDictionary *)request_data completion:( void (^)(NSDictionary *) )completionBlock
+- (void)request:(NSString *)authorizationServer
+    requestData:(NSDictionary *)request_data
+requestCorrelationId: (NSUUID*) requestCorrelationId
+     completion:( void (^)(NSDictionary *) )completionBlock
 {
-    // Generate a client-request-id
-    CFUUIDRef uuid = CFUUIDCreate(kCFAllocatorDefault);
-    NSString *uuidString = (__bridge_transfer NSString *)CFUUIDCreateString(kCFAllocatorDefault, uuid);
-    CFRelease(uuid);
-    
     NSString* endPoint = [authorizationServer stringByAppendingString:OAUTH2_TOKEN_SUFFIX];
-    NSString* log = [NSString stringWithFormat:@"Sending POST request to %@ with client-request-id %@", endPoint, uuidString];
-    AD_LOG_VERBOSE(@"POST request", log);
+
     
     HTTPWebRequest *webRequest = [[HTTPWebRequest alloc] initWithURL:[NSURL URLWithString:endPoint]];
     
     webRequest.method = HTTPPost;
     [webRequest.headers setObject:@"application/json" forKey:@"Accept"];
     [webRequest.headers setObject:@"application/x-www-form-urlencoded" forKey:@"Content-Type"];
-    [webRequest.headers setObject:uuidString forKey:@"client-request-id"];
+    NSString* requestId;
+    if (requestCorrelationId)
+    {
+        requestId = [requestCorrelationId UUIDString];
+        [webRequest.headers setObject:requestId forKey:@"client-request-id"];
+    }
+    AD_LOG_VERBOSE_F(@"Post request", @"Sending POST request to %@ with client-request-id %@", endPoint, requestId);
     
     webRequest.body = [[request_data URLFormEncode] dataUsingEncoding:NSUTF8StringEncoding];
     
@@ -857,49 +1133,64 @@ extraQueryParameters: (NSString*) queryParams
         
         if ( error == nil )
         {
-            if ( webResponse.statusCode == 200 || webResponse.statusCode == 400 )
+            switch (webResponse.statusCode)
             {
-                NSError   *jsonError  = nil;
-                id         jsonObject = [NSJSONSerialization JSONObjectWithData:webResponse.body options:0 error:&jsonError];
-                
-                if ( nil != jsonObject && [jsonObject isKindOfClass:[NSDictionary class]] )
-                {
-                    // Load the response
-                    response = (NSDictionary *)jsonObject;
-                }
-                else
-                {
-                    // Unrecognized JSON response
-                    AD_LOG_WARN(@"JSON deserialization", jsonError.localizedDescription);
-                    NSMutableDictionary *mutableResponse = [[NSMutableDictionary alloc] initWithCapacity:2];
-                    [mutableResponse setObject:AUTH_FAILED forKey:OAUTH2_ERROR];
-                    [mutableResponse setObject:jsonError.localizedDescription forKey:OAUTH2_ERROR_DESCRIPTION];
+                case 200:
+                case 400:
+                case 401:
+                    {
+                        NSError   *jsonError  = nil;
+                        id         jsonObject = [NSJSONSerialization JSONObjectWithData:webResponse.body options:0 error:&jsonError];
                     
-                    response = mutableResponse;
-                }
-            }
-            else
-            {
-                // Request failure
-                NSString* logMessage = [NSString stringWithFormat:@"Server HTTP Status %ld", (long)webResponse.statusCode];
-                NSString* logInformation = [NSString stringWithFormat:@"Server HTTP Response %@", [[NSString alloc] initWithData:webResponse.body encoding:NSUTF8StringEncoding]];
-                AD_LOG_WARN(logMessage, logInformation);
-                
-                //Now add the information to the dictionary, so that the parser can extract it:
-                NSMutableDictionary *mutableResponse = [[NSMutableDictionary alloc] initWithCapacity:2];
-                [mutableResponse setObject:AUTH_FAILED forKey:OAUTH2_ERROR];
-                [mutableResponse setObject:AUTH_FAILED_SERVER_ERROR forKey:OAUTH2_ERROR_DESCRIPTION];
-                
-                response = mutableResponse;
+                        if ( nil != jsonObject && [jsonObject isKindOfClass:[NSDictionary class]] )
+                        {
+                            // Load the response
+                            response = (NSDictionary *)jsonObject;
+                        }
+                        else
+                        {
+                            ADAuthenticationError* adError;
+                            if (jsonError)
+                            {
+                                // Unrecognized JSON response
+                                AD_LOG_WARN(@"JSON deserialization", jsonError.localizedDescription);
+                                adError = [ADAuthenticationError errorFromNSError:jsonError errorDetails:jsonError.localizedDescription];
+                            }
+                            else
+                            {
+                                adError = [ADAuthenticationError unexpectedInternalError:[NSString stringWithFormat:@"Unexpected object type: %@", [jsonObject class]]];
+                            }
+                            NSMutableDictionary *mutableResponse = [[NSMutableDictionary alloc] initWithCapacity:1];
+                            [mutableResponse setObject:adError
+                                                forKey:AUTH_NON_PROTOCOL_ERROR];
+                            response = mutableResponse;
+                        }
+                    }
+                    break;
+                default:
+                    {
+                        // Request failure
+                        NSString* body = [[NSString alloc] initWithData:webResponse.body encoding:NSUTF8StringEncoding];
+                        NSString* errorData = [NSString stringWithFormat:@"Server HTTP status code: %ld. Full response %@", (long)webResponse.statusCode, body];
+                        AD_LOG_WARN(@"HTTP Error", errorData);
+                        
+                        //Now add the information to the dictionary, so that the parser can extract it:
+                        NSMutableDictionary *mutableResponse = [[NSMutableDictionary alloc] initWithCapacity:1];
+                        [mutableResponse setObject:[ADAuthenticationError errorFromAuthenticationError:AD_ERROR_AUTHENTICATION protocolCode:nil errorDetails:errorData]
+                                            forKey:AUTH_NON_PROTOCOL_ERROR];
+                        
+                        response = mutableResponse;
+                    }
             }
         }
         else
         {
-            // System error
-            NSMutableDictionary *mutableResponse = [[NSMutableDictionary alloc] initWithCapacity:2];
-            [mutableResponse setObject:AUTH_FAILED forKey:OAUTH2_ERROR];
-            [mutableResponse setObject:error.localizedDescription forKey:OAUTH2_ERROR_DESCRIPTION];
             AD_LOG_WARN(@"System error while making request.", error.description);
+            // System error
+            NSMutableDictionary *mutableResponse = [[NSMutableDictionary alloc] initWithCapacity:1];
+            [mutableResponse setObject:[ADAuthenticationError errorFromNSError:error errorDetails:error.localizedDescription]
+                                forKey:AUTH_NON_PROTOCOL_ERROR];
+
             
             response = mutableResponse;
         }
@@ -908,27 +1199,11 @@ extraQueryParameters: (NSString*) queryParams
     }];
 }
 
-// Verify we are running on the main thread and abort with a message otherwise
-+ (void)assertMainThread:(NSString *)message
-{
-    if (![[NSThread currentThread] isEqual:[NSThread mainThread]])
-    {
-        NSAssert(false, message);
-        @throw [NSException exceptionWithName:NSInternalInconsistencyException reason:message userInfo:nil];
-    }
-}
-
-// Decodes the state parameter from a protocol message
-+ (NSDictionary *)decodeProtocolState:(NSString *)encodedState
-{
-    return [NSDictionary URLFormDecode:[encodedState adBase64Decode]];
-}
-
 // Encodes the state parameter for a protocol message
 - (NSString *)encodeProtocolStateWithResource:(NSString *)resource scope:(NSString *)scope
 {
     return [[[NSMutableDictionary dictionaryWithObjectsAndKeys:self.authority, @"a", resource, @"r", scope, @"s", nil]
-             URLFormEncode] adBase64Encode];
+             URLFormEncode] adBase64UrlEncode];
 }
 
 

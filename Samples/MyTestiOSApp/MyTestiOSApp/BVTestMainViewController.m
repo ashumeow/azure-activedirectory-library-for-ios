@@ -24,6 +24,7 @@
 #import <ADALiOS/ADDefaultTokenCacheStore.h>
 #import <ADALiOS/ADAuthenticationSettings.h>
 #import <ADALiOS/ADLogger.h>
+#import <ADALiOS/ADInstanceDiscovery.h>
 
 @interface BVTestMainViewController ()
 @property (weak, nonatomic) IBOutlet UILabel *resultLabel;
@@ -119,6 +120,8 @@
     
     [self.resultLabel setText:@"Starting 401 challenge."];
     BVTestMainViewController* __weak weakSelf = self;
+    [self.resultLabel setText:@"Starting 401 challenge."];
+
     NSString* __block resourceString = @"http://testapi007.azurewebsites.net/api/WorkItem";
 //    NSURL* resource = [NSURL URLWithString:@"http://testapi007.azurewebsites.net/api/WorkItem"];
 //    [ADAuthenticationParameters parametersFromResourceUrl:resource completionBlock:^(ADAuthenticationParameters * params, ADAuthenticationError * error)
@@ -145,9 +148,10 @@
              return;
          }
          
-         [context acquireToken:resourceString clientId:clientId
-                   redirectUri:[NSURL URLWithString:redirectUri]
-               completionBlock:^(ADAuthenticationResult *result) {
+         [context acquireTokenWithResource:resourceString clientId:clientId
+                               redirectUri:[NSURL URLWithString:redirectUri]
+                                    userId:@"boris@msopentechbv.onmicrosoft.com"
+                           completionBlock:^(ADAuthenticationResult *result) {
                    if (result.status != AD_SUCCEEDED)
                    {
                        [weakSelf setStatus:result.error.errorDetails];
@@ -204,19 +208,20 @@
 
 - (IBAction)refreshTokenPressed:(id)sender
 {
-    NSString* authority = @"https://login.windows.net/msopentechbv.onmicrosoft.com/oauth2";//OmerCan: params.authority
+    NSString* authority = @"https://login.windows.net/msopentechbv.onmicrosoft.com";//OmerCan: params.authority
     NSString* clientId = @"c3c7f5e5-7153-44d4-90e6-329686d48d76";//OmerCan: @"c4acbce5-b2ed-4dc5-a1b9-c95af96c0277"
     NSString* resourceString = @"http://localhost/TodoListService";
     //    NSString* redirectUri = @"http://todolistclient/";//OmerCan: @"https://omercantest.onmicrosoft.adal/hello"
     [self setStatus:@"Attemp to refresh..."];
     ADAuthenticationError* error;
-    ADAuthenticationContext* context = [ADAuthenticationContext contextWithAuthority:authority error:&error];
+    ADAuthenticationContext* context = [ADAuthenticationContext authenticationContextWithAuthority:authority error:&error];
     if (!context)
     {
         [self setStatus:error.errorDetails];
         return;
     }
-    ADTokenCacheStoreKey* key = [ADTokenCacheStoreKey keyWithAuthority:authority resource:resourceString clientId:clientId error:&error];
+    //We will leverage a multi-resource refresh token:
+    ADTokenCacheStoreKey* key = [ADTokenCacheStoreKey keyWithAuthority:authority resource:nil clientId:clientId error:&error];
     if (!key)
     {
         [self setStatus:error.errorDetails];

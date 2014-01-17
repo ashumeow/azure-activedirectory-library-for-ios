@@ -42,11 +42,12 @@ typedef enum
 @interface ADAuthenticationResult : NSObject
 {
 @protected
-    
     //See the corresponding properties for details.
-    ADTokenCacheStoreItem* _tokenCacheStoreItem;
-    ADAuthenticationResultStatus _status;
-    ADAuthenticationError* _error;
+    ADTokenCacheStoreItem*          _tokenCacheStoreItem;
+    ADAuthenticationResultStatus    _status;
+    ADAuthenticationError*          _error;
+    BOOL                            _multiResourceRefreshToken;
+    NSUUID*                         _correlationId;
 }
 
 /*! See the ADAuthenticationResultStatus details */
@@ -56,6 +57,14 @@ typedef enum
 
 /*! The error that occurred or nil, if the operation was successful */
 @property (readonly) ADAuthenticationError* error;
+
+/*! Set to YES, if part of the result contains a refresh token, which is a multi-resource
+ refresh token. */
+@property (readonly) BOOL multiResourceRefreshToken;
+
+/*! The correlation id, returned by the server. Used for diagnostic purposes. Can be nil, if
+ the server did not return one, or the item was extracted from the cache. */
+@property (readonly) NSUUID* correlationId;
 
 @end
 

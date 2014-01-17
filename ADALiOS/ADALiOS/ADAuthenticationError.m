@@ -49,7 +49,8 @@ NSString* const ADInvalidArgumentMessage = @"The argument '%@' is invalid. Value
 {
     NSString* superDescription = [super description];
     
-    return [NSString stringWithFormat:@"Error with code: %lu Domain: %@ ProtocolCode:%@ Details:%@. Inner error details: %@", (long)self.code, self.domain, self.protocolCode, self.errorDetails, superDescription];
+    return [NSString stringWithFormat:@"Error with code: %lu Domain: %@ ProtocolCode:%@ Details:%@. Inner error details: %@",
+            (long)self.code, self.domain, self.protocolCode, self.errorDetails, superDescription];
 }
 
 -(id) initInternalWithDomain: (NSString*) domain
@@ -64,13 +65,14 @@ NSString* const ADInvalidArgumentMessage = @"The argument '%@' is invalid. Value
     {
         NSString* message = [NSString stringWithFormat:@"Error raised: %lu", (long)code];
         NSString* info = [NSString stringWithFormat:@"Domain: %@ ProtocolCode:%@ Details:%@", domain, protocolCode, details];
-        AD_LOG_ERROR(message, info, code);
+        AD_LOG_ERROR(message, code, info);
     }
     
     self = [super initWithDomain:domain code:code userInfo:userInfo];
     if (self)
     {
         _errorDetails = details;
+        _protocolCode = protocolCode;
     }
     return self;
 }

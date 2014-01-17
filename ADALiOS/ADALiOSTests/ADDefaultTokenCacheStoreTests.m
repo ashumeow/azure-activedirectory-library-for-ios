@@ -159,25 +159,6 @@ NSString* const sFileNameEmpty = @"Invalid or empty file name";
     XCTAssertEqualObjects(store, mStore, "Different objects returned");
 }
 
-//Ensures that two items are the same:
--(void) verifySameWithItem: (ADTokenCacheStoreItem*) item1
-                     item2: (ADTokenCacheStoreItem*) item2
-{
-    XCTAssertNotNil(item1);
-    XCTAssertNotNil(item2);
-    ADAssertStringEquals(item1.resource, item2.resource);
-    ADAssertStringEquals(item1.authority, item2.authority);
-    ADAssertStringEquals(item1.clientId, item2.clientId);
-    ADAssertStringEquals(item1.accessToken, item2.accessToken);
-    ADAssertStringEquals(item1.refreshToken, item2.refreshToken);
-    ADAssertDateEquals(item1.expiresOn, item2.expiresOn);
-    ADAssertStringEquals(item1.userInformation.userId, item2.userInformation.userId);
-    ADAssertStringEquals(item1.userInformation.givenName, item2.userInformation.givenName);
-    ADAssertStringEquals(item1.userInformation.familyName, item2.userInformation.familyName);
-    XCTAssertEqual(item1.userInformation.userIdDisplayable, item2.userInformation.userIdDisplayable);
-    ADAssertStringEquals(item1.tenantId, item2.tenantId);
-}
-
 //Esnures that two keys are the same:
 -(void) verifySameWithKey: (ADTokenCacheStoreKey*) key1
                      key2: (ADTokenCacheStoreKey*) key2
@@ -527,6 +508,12 @@ NSString* const sFileNameEmpty = @"Invalid or empty file name";
     {
         XCTFail("Timeout. Most likely one or more of the threads have crashed or hanged.");
     }
+    else
+    {
+        //This test tends to create random failures of the tests that follow. Adding these in attempt to stabilize:
+        usleep(500);//0.5 seconds
+        [self waitForPersistence];//Ensure clean exit.
+    }
 }
 
 //Waits for persistence
@@ -553,10 +540,13 @@ NSString* const sFileNameEmpty = @"Invalid or empty file name";
 
 //Waits and checks that the cache was persisted.
 //The logs should be cleared before performing the operation that leads to persistence.
--(void) validateAsynchronousPersistence
+-(void) validateAsynchronousPersistenceWithLine: (int) line
 {
     [self waitForPersistence];
-    ADAssertLogsContainValue(TEST_LOG_INFO, sPersisted);
+    [self assertLogsContain:sPersisted
+                    logPart:TEST_LOG_INFO
+                       file:__FILE__
+                       line:line];
 }
 
 //Ensures that the cache is eventually persisted when modified:
@@ -571,20 +561,25 @@ NSString* const sFileNameEmpty = @"Invalid or empty file name";
     ADAuthenticationError* error;
     [mStore addOrUpdateItem:item error:&error];
     ADAssertNoError;
-    [self validateAsynchronousPersistence];
+    [self validateAsynchronousPersistenceWithLine:__LINE__];
     
     //Remove an item:
+    error = nil;
     [self clearLogs];
     [mStore removeItem:item error:&error];
     ADAssertNoError;
-    [self validateAsynchronousPersistence];
+    [self validateAsynchronousPersistenceWithLine:__LINE__];
     
+    error = nil;
+    [self clearLogs];
     [mStore addOrUpdateItem:item error:&error];
     ADAssertNoError;
+    [self validateAsynchronousPersistenceWithLine:__LINE__];
     
+    error = nil;
     [self clearLogs];
     [mStore removeAll];
-    [self validateAsynchronousPersistence];
+    [self validateAsynchronousPersistenceWithLine:__LINE__];
 }
 
 //Add large number of items to the cache and makes. Acts as a mini-stress test too
@@ -650,7 +645,6 @@ NSString* const sFileNameEmpty = @"Invalid or empty file name";
     ADAssertNoError;
     XCTAssertTrue([mStore getArchivedRevision] == [mStore getCurrenRevision]);
     ADAssertStringEquals(originalFile, [mStore getLastArchiveFile]);
-    ADAssertLogsDoNotContainValue(TEST_LOG_MESSAGE, sNoNeedForPersistence);
     ADAssertLogsContainValue(TEST_LOG_INFO, sPersisted);
     ADAssertLogsContainValue(TEST_LOG_INFO, originalFile);
     

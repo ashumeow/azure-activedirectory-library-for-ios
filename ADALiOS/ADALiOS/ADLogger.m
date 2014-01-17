@@ -38,7 +38,10 @@ BOOL sNSLogging = YES;
 
 +(void) setLogCallBack: (LogCallback) callback
 {
-    sLogCallback = callback;
+    @synchronized(self)//Avoid changing to null while attempting to call it.
+    {
+        sLogCallback = callback;
+    }
 }
 
 +(LogCallback) getLogCallBack
@@ -89,8 +92,8 @@ BOOL sNSLogging = YES;
 
 +(void) log: (ADAL_LOG_LEVEL)logLevel
     message: (NSString*) message
-additionalInformation: (NSString*) additionalInformation
   errorCode: (NSInteger) errorCode
+additionalInformation: (NSString*) additionalInformation
 {
     //Note that the logging should not throw, as logging is heavily used in error conditions.
     //Hence, the checks below would rather swallow the error instead of throwing and changing the
@@ -104,11 +107,16 @@ additionalInformation: (NSString*) additionalInformation
     {
         if (sNSLogging)
         {
+            //NSLog is documented as thread-safe:
             NSLog([self formatStringPerLevel:logLevel], message, additionalInformation, errorCode);
         }
-        if (sLogCallback)
+        
+        @synchronized(self)//Guard against thread-unsafe callback and modification of sLogCallback after the check
         {
-            sLogCallback(logLevel, message, additionalInformation, errorCode);
+            if (sLogCallback)
+            {
+                sLogCallback(logLevel, message, additionalInformation, errorCode);
+            }
         }
     }
 }

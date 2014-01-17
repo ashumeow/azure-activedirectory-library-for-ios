@@ -22,6 +22,7 @@
 #import "WebAuthenticationWebViewController.h"
 #import "WebAuthenticationViewController.h"
 #import "WebAuthenticationBroker.h"
+#import "ADAuthenticationSettings.h"
 
 
 static NSString *const WAB_FAILED_ERROR         = @"Authorization Failed";
@@ -43,7 +44,7 @@ static NSString *const WAB_FAILED_NO_RESOURCES  = @"The required resource bundle
     
     NSLock                             *_completionLock;
     
-    void (^_completionBlock)( NSError *, NSURL *);
+    void (^_completionBlock)( ADAuthenticationError *, NSURL *);
 }
 
 #pragma mark Shared Instance Methods
@@ -217,10 +218,8 @@ static NSString *_resourcePath = nil;
             else
             {
                 // Dispatch the completion block
-                NSDictionary *userInfo = [NSDictionary dictionaryWithObjectsAndKeys:WAB_FAILED_ERROR, @"error", WAB_FAILED_NO_RESOURCES, @"error_description", nil];
-                NSError      *error    = [[NSError alloc] initWithDomain:@"WebAuthenticationBroker" code:WebAuthenticationFailed userInfo:userInfo];
-                
-                dispatch_async( dispatch_get_main_queue(), ^{
+                ADAuthenticationError   *error = [ADAuthenticationError errorFromAuthenticationError:AD_ERROR_APPLICATION protocolCode:nil errorDetails:WAB_FAILED_NO_RESOURCES];
+                dispatch_async( [ADAuthenticationSettings sharedInstance].dispatchQueue, ^{
                     _completionBlock( error, nil );
                 });
             }
@@ -228,10 +227,8 @@ static NSString *_resourcePath = nil;
         else
         {
             // Dispatch the completion block
-            NSDictionary *userInfo = [NSDictionary dictionaryWithObjectsAndKeys:WAB_FAILED_ERROR, @"error", WAB_FAILED_NO_CONTROLLER, @"error_description", nil];
-            NSError      *error    = [[NSError alloc] initWithDomain:@"WebAuthenticationBroker" code:WebAuthenticationFailed userInfo:userInfo];
-            
-            dispatch_async( dispatch_get_main_queue(), ^{
+            ADAuthenticationError   *error = [ADAuthenticationError errorFromAuthenticationError:AD_ERROR_APPLICATION protocolCode:nil errorDetails:WAB_FAILED_NO_CONTROLLER];
+            dispatch_async( [ADAuthenticationSettings sharedInstance].dispatchQueue, ^{
                 _completionBlock( error, nil );
             });
         }
@@ -250,10 +247,8 @@ static NSString *_resourcePath = nil;
         else
         {
             // Dispatch the completion block
-            NSDictionary *userInfo = [NSDictionary dictionaryWithObjectsAndKeys:WAB_FAILED_ERROR, @"error", WAB_FAILED_NO_RESOURCES, @"error_description", nil];
-            NSError      *error    = [[NSError alloc] initWithDomain:@"WebAuthenticationBroker" code:WebAuthenticationFailed userInfo:userInfo];
-            
-            dispatch_async( dispatch_get_main_queue(), ^{
+            ADAuthenticationError   *error = [ADAuthenticationError errorFromAuthenticationError:AD_ERROR_APPLICATION protocolCode:nil errorDetails:WAB_FAILED_NO_RESOURCES];
+            dispatch_async( [ADAuthenticationSettings sharedInstance].dispatchQueue, ^{
                 _completionBlock( error, nil );
             });
         }
@@ -267,7 +262,7 @@ static NSString *_resourcePath = nil;
 
 #pragma mark - Private Methods
 
-- (void)dispatchCompletionBlock:(NSError *)error URL:(NSURL *)url
+- (void)dispatchCompletionBlock:(ADAuthenticationError *)error URL:(NSURL *)url
 {
     // NOTE: It is possible that race between a successful completion
     //       and the user cancelling the authentication dialog can
@@ -279,7 +274,7 @@ static NSString *_resourcePath = nil;
     
     if ( _completionBlock )
     {
-        void (^completionBlock)( NSError *, NSURL *) = _completionBlock;
+        void (^completionBlock)( ADAuthenticationError *, NSURL *) = _completionBlock;
         _completionBlock = nil;
         
         dispatch_async( dispatch_get_main_queue(), ^{
@@ -299,20 +294,20 @@ static NSString *_resourcePath = nil;
     DebugLog();
     
     // Dispatch the completion block
-    NSDictionary *userInfo = [NSDictionary dictionaryWithObjectsAndKeys:WAB_FAILED_ERROR, @"error", WAB_FAILED_CANCELLED, @"error_description", nil];
-    NSError      *err      = [[NSError alloc] initWithDomain:@"WebAuthenticationBroker" code:WebAuthenticationCancelled userInfo:userInfo];
+
+    ADAuthenticationError* error = [ADAuthenticationError errorFromAuthenticationError:AD_ERROR_USER_CANCEL protocolCode:nil errorDetails:WAB_FAILED_CANCELLED];
     
     if ( nil != _authenticationViewController)
     {
         // Dismiss the authentication view and dispatch the completion block
         [[UIApplication currentViewController] dismissViewControllerAnimated:YES completion:^{
-            [self dispatchCompletionBlock:err URL:nil];
+            [self dispatchCompletionBlock:error URL:nil];
         }];
     }
     else
     {
         [_authenticationWebViewController stop];
-        [self dispatchCompletionBlock:err URL:nil];
+        [self dispatchCompletionBlock:error URL:nil];
     }
     
     _authenticationViewController    = nil;
@@ -345,20 +340,19 @@ static NSString *_resourcePath = nil;
 - (void)webAuthenticationDidFailWithError:(NSError *)error
 {
     // Dispatch the completion block
-    NSDictionary *userInfo = [NSDictionary dictionaryWithObjectsAndKeys:[NSString stringWithFormat:WAB_FAILED_ERROR_CODE, (long)error.code], @"error", error.description, @"error_description", nil];
-    NSError      *err      = [[NSError alloc] initWithDomain:@"WebAuthenticationBroker" code:WebAuthenticationFailed userInfo:userInfo];
+    ADAuthenticationError* adError = [ADAuthenticationError errorFromNSError:error errorDetails:error.localizedDescription];
     
     if ( nil != _authenticationViewController)
     {
         // Dismiss the authentication view and dispatch the completion block
         [[UIApplication currentViewController] dismissViewControllerAnimated:YES completion:^{
-            [self dispatchCompletionBlock:err URL:nil];
+            [self dispatchCompletionBlock:adError URL:nil];
         }];
     }
     else
     {
         [_authenticationWebViewController stop];
-        [self dispatchCompletionBlock:err URL:nil];
+        [self dispatchCompletionBlock:adError URL:nil];
     }
     
     _authenticationViewController    = nil;
