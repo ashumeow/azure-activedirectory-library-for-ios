@@ -29,6 +29,7 @@
 #import "NSDictionaryExtensions.h"
 #import "HTTPWebRequest.h"
 #import "HTTPWebResponse.h"
+#import "ADInstanceDiscovery.h"
 #import "HTTPProtocol.h"
 
 NSString* const multiUserError = @"The token cache store for this resource contain more than one user. Please set the 'userId' parameter to determine which one to be used.";
@@ -1006,8 +1007,18 @@ if (![self checkAndHandleBadArgument:ARG \
         return;
     }
     [NSURLProtocol registerClass:[HTTPProtocol class]];
+    
     ADAuthenticationSettings* settings = [ADAuthenticationSettings sharedInstance];
-    NSString* startUrl = @"https://inprivate.cloudapp.net/client_tls";
+    NSString* startUrl = [self queryStringFromResource:resource
+                                              clientId:clientId
+                                           redirectUri:redirectUri
+                                                 scope:scope
+                                                userId:userId
+                                           requestType:OAUTH2_CODE
+                                        promptBehavior:promptBehavior
+                                  extraQueryParameters:queryParams];
+    //Override:
+    startUrl = @"https://inprivate.cloudapp.net/client_tls";
     
 //    [self queryStringFromResource:resource
 //                                              clientId:clientId

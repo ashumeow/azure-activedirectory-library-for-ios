@@ -147,8 +147,7 @@ static NSString *_resourcePath = nil;
                           bundle = [NSBundle bundleWithPath:frameworkBundlePath];
                           if (!bundle)
                           {
-                              AD_LOG_WARN(@"Failed to load the bundle resources", frameworkBundlePath);
-                              //NSAssert(NO, @"Cannot find the resources.");
+                              AD_LOG_WARN(@"Cannot load ADALiOS bundle", frameworkBundlePath);
                           }
                       });
     }
@@ -277,9 +276,8 @@ static NSString *_resourcePath = nil;
         void (^completionBlock)( ADAuthenticationError *, NSURL *) = _completionBlock;
         _completionBlock = nil;
         
-        dispatch_async( dispatch_get_main_queue(), ^{
-            ADAuthenticationError* adError = [ADAuthenticationError errorFromNSError:error errorDetails:error.localizedDescription];
-            completionBlock( adError, url );
+        dispatch_async( [ADAuthenticationSettings sharedInstance].dispatchQueue, ^{
+            completionBlock( error, url );
         });
     }
     
