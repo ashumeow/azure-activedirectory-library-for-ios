@@ -19,6 +19,10 @@
 
 #import "ADALiOS.h"
 #import "ADLogger.h"
+#import "ADOAuth2Constants.h"
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <mach/machine.h>
 
 ADAL_LOG_LEVEL sLogLevel = ADAL_LOG_LEVEL_ERROR;
 LogCallback sLogCallback;
@@ -119,6 +123,45 @@ additionalInformation: (NSString*) additionalInformation
             }
         }
     }
+}
+
+//Extracts the CPU information according to the constants defined in
+//machine.h file. The method prints minimal information - only if 32 or
+//64 bit CPU architecture is being used.
++(NSString*) getCPUInfo
+{
+    size_t structSize;
+    cpu_type_t cpuType;
+    structSize = sizeof(cpuType);
+    
+    //Extract the CPU type. E.g. x86. See machine.h for details
+    //See sysctl.h for details.
+    int result = sysctlbyname("hw.cputype", &cpuType, &structSize, NULL, 0);
+    if (result)
+    {
+        AD_LOG_WARN_F(@"Logging", @"Cannot extract cpu type. Error: %d", result);
+        return nil;
+    }
+    
+    return (CPU_ARCH_ABI64 & cpuType) ? @"64" : @"32";
+}
+
++(NSDictionary*) adalId
+{
+    UIDevice* device = [UIDevice currentDevice];
+    NSMutableDictionary* result = [NSMutableDictionary dictionaryWithDictionary:
+    @{
+      ADAL_ID_PLATFORM:@"iOS",
+      ADAL_ID_VERSION:[NSString stringWithFormat:@"%d.%d", ADAL_VER_HIGH, ADAL_VER_LOW],
+      ADAL_ID_OS_VER:device.systemVersion,
+      ADAL_ID_DEVICE_MODEL:device.model,//Prints out only "iPhone" or "iPad".
+      }];
+    NSString* CPUVer = [self getCPUInfo];
+    if (![NSString isStringNilOrBlank:CPUVer])
+    {
+        [result setObject:CPUVer forKey:ADAL_ID_CPU];
+    }
+    return result;
 }
 
 @end

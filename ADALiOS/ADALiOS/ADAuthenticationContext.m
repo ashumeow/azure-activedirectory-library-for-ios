@@ -19,7 +19,6 @@
 
 #import "ADALiOS.h"
 #import "ADAuthenticationContext.h"
-#import "ADDefaultTokenCacheStore.h"
 #import "ADAuthenticationResult+Internal.h"
 #import "ADOAuth2Constants.h"
 #import "WebAuthenticationBroker.h"
@@ -109,7 +108,7 @@ if (![self checkAndHandleBadArgument:ARG \
     API_ENTRY;
     return [self authenticationContextWithAuthority: authority
                                   validateAuthority: YES
-                                    tokenCacheStore: [ADDefaultTokenCacheStore sharedInstance]
+                                    tokenCacheStore: [ADAuthenticationSettings sharedInstance].defaultTokenCacheStore
                                               error: error];
 }
 
@@ -120,7 +119,7 @@ if (![self checkAndHandleBadArgument:ARG \
     API_ENTRY
     return [self authenticationContextWithAuthority: authority
                                   validateAuthority: bValidate
-                                    tokenCacheStore: [ADDefaultTokenCacheStore sharedInstance]
+                                    tokenCacheStore: [ADAuthenticationSettings sharedInstance].defaultTokenCacheStore
                                               error: error];
 }
 
@@ -142,7 +141,6 @@ if (![self checkAndHandleBadArgument:ARG \
 {
     API_ENTRY;
     RETURN_NIL_ON_NIL_EMPTY_ARGUMENT(authority);
-    
 
     return [[self alloc] initWithAuthority: authority
                          validateAuthority: bValidate
@@ -739,12 +737,6 @@ if (![self checkAndHandleBadArgument:ARG \
         [request_data setObject:resource forKey:OAUTH2_RESOURCE];
     }
     
-    // Append platform_id if it has been set
-    if ( [ADAuthenticationSettings sharedInstance].platformId != nil )
-    {
-        [request_data setObject:[ADAuthenticationSettings sharedInstance].platformId forKey:@"platform_id"];
-    }
-    
     dispatch_async([ADAuthenticationSettings sharedInstance].dispatchQueue, ^
                    {
                        AD_LOG_INFO_F(@"Sending request for refreshing token.", @"Client id: '%@'; resource: '%@'; user:'%@'", clientId, resource, userId);
@@ -919,34 +911,38 @@ if (![self checkAndHandleBadArgument:ARG \
 {
     NSString *state    = [self encodeProtocolStateWithResource:resource scope:scope];
     // Start the web navigation process for the Implicit grant profile.
-    NSString *startUrl = [NSString stringWithFormat:@"%@?%@=%@&%@=%@&%@=%@&%@=%@&%@=%@",
-                          [self.authority stringByAppendingString:OAUTH2_AUTHORIZE_SUFFIX],
-                          OAUTH2_RESPONSE_TYPE, requestType,
-                          OAUTH2_CLIENT_ID, [clientId adUrlFormEncode],
-                          OAUTH2_RESOURCE, [resource adUrlFormEncode],
-                          OAUTH2_REDIRECT_URI, [[redirectUri absoluteString] adUrlFormEncode],
-                          OAUTH2_STATE, state];
-    NSString* platformId = [ADAuthenticationSettings sharedInstance].platformId;
-    if (![NSString isStringNilOrBlank:platformId])
-    {
-        startUrl = [startUrl stringByAppendingString:[NSString stringWithFormat:@"&%@=%@", OAUTH2_PLATFORM_ID, [platformId adUrlFormEncode]]];
-    }
+    NSMutableString *startUrl = [NSMutableString stringWithFormat:@"%@?%@=%@&%@=%@&%@=%@&%@=%@&%@=%@",
+                                 [self.authority stringByAppendingString:OAUTH2_AUTHORIZE_SUFFIX],
+                                 OAUTH2_RESPONSE_TYPE, requestType,
+                                 OAUTH2_CLIENT_ID, [clientId adUrlFormEncode],
+                                 OAUTH2_RESOURCE, [resource adUrlFormEncode],
+                                 OAUTH2_REDIRECT_URI, [[redirectUri absoluteString] adUrlFormEncode],
+                                 OAUTH2_STATE, state];
+    
+    [startUrl appendFormat:@"&%@", [[ADLogger adalId] URLFormEncode]];
+
     if (![NSString isStringNilOrBlank:userId])
     {
-        startUrl = [startUrl stringByAppendingString:[NSString stringWithFormat:@"&%@=%@", OAUTH2_LOGIN_HINT, [userId adUrlFormEncode]]];
+        [startUrl appendFormat:@"&%@=%@", OAUTH2_LOGIN_HINT, [userId adUrlFormEncode]];
     }
     if (AD_PROMPT_ALWAYS == promptBehavior)
     {
         //Force the server to ignore cookies, by specifying explicitly the prompt behavior:
-        startUrl = [startUrl stringByAppendingString:[NSString stringWithFormat:@"&prompt=login"]];
+        [startUrl appendString:@"&prompt=login"];
     }
     if (![NSString isStringNilOrBlank:queryParams])
     {//Append the additional query parameters if specified:
         queryParams = queryParams.trimmedString;
         
         //Add the '&' for the additional params if not there already:
-        startUrl = [queryParams hasPrefix:@"&"] ? [startUrl stringByAppendingString:queryParams]
-                                                : [startUrl stringByAppendingString:[NSString stringWithFormat:@"&%@", queryParams]];
+        if ([queryParams hasPrefix:@"&"])
+        {
+            [startUrl appendString:queryParams];
+        }
+        else
+        {
+            [startUrl appendFormat:@"&%@", queryParams];
+        }
     }
     
     return startUrl;
@@ -1030,7 +1026,6 @@ if (![self checkAndHandleBadArgument:ARG \
     
     [[WebAuthenticationBroker sharedInstance] start:[NSURL URLWithString:startUrl]
                                                 end:[NSURL URLWithString:[redirectUri absoluteString]]
-                                            ssoMode:settings.singleSignOn
                                             webView:webView
                                          fullScreen:settings.enableFullScreen
                                          completion:^( ADAuthenticationError *error, NSURL *end )
@@ -1092,12 +1087,6 @@ if (![self checkAndHandleBadArgument:ARG \
                                          clientId, OAUTH2_CLIENT_ID,
                                          [redirectUri absoluteString], OAUTH2_REDIRECT_URI,
                                          nil];
-    
-    // Append platform_id if it has been set
-    if ( [ADAuthenticationSettings sharedInstance].platformId != nil )
-    {
-        [request_data setObject:[ADAuthenticationSettings sharedInstance].platformId forKey:OAUTH2_PLATFORM_ID];
-    }
     
     NSUUID* requestId = [self getRequestCorrelationId];
     [self request:self.authority

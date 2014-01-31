@@ -1,3 +1,4 @@
+// Created by Boris Vidolov on 1/11/14.
 // Copyright © Microsoft Open Technologies, Inc.
 //
 // All Rights Reserved
@@ -16,24 +17,14 @@
 // See the Apache License, Version 2.0 for the specific language
 // governing permissions and limitations under the License.
 
-enum WebAuthenticationStatus
-{
-    WebAuthenticationFailed    = 0,
-    WebAuthenticationSucceeded = 1,
-    WebAuthenticationCancelled = 2,
-};
+#import <ADALiOS/ADPersistentTokenCacheStore.h>
 
-@class ADAuthenticationError;
+@interface ADKeychainTokenCacheStore : ADPersistentTokenCacheStore
 
-typedef void (^ADBrokerCallback) (ADAuthenticationError* error, NSURL*);
-@interface WebAuthenticationBroker : NSObject
-
-+ (NSString *)resourcePath;
-+ (void)setResourcePath:(NSString *)resourcePath;
-
-+ (WebAuthenticationBroker *)sharedInstance;
-
-- (void)start:(NSURL *)startURL end:(NSURL *)endURL webView:(WebViewType *)webView fullScreen:(BOOL)fullScreen completion: (ADBrokerCallback) completionBlock;
-- (void)cancel;
+/*! Initializes the token cache store.
+ @param: cacheLocation: The library specific key to use for identifying token 
+ cache items among the keychain items. Example: "MSOpenTech.ADAL.1.0".
+ The initializer returns nil, if cacheLocation is nil or empty.*/
+-(id) initWithLocation: (NSString *)cacheLocation;
 
 @end

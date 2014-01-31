@@ -1,3 +1,4 @@
+// Created by Boris Vidolov on 1/14/14.
 // Copyright © Microsoft Open Technologies, Inc.
 //
 // All Rights Reserved
@@ -16,24 +17,14 @@
 // See the Apache License, Version 2.0 for the specific language
 // governing permissions and limitations under the License.
 
-enum WebAuthenticationStatus
-{
-    WebAuthenticationFailed    = 0,
-    WebAuthenticationSucceeded = 1,
-    WebAuthenticationCancelled = 2,
-};
+#import <ADALiOS/ADPersistentTokenCacheStore.h>
 
-@class ADAuthenticationError;
+@interface ADEncryptedFileTokenCacheStore : ADPersistentTokenCacheStore
 
-typedef void (^ADBrokerCallback) (ADAuthenticationError* error, NSURL*);
-@interface WebAuthenticationBroker : NSObject
-
-+ (NSString *)resourcePath;
-+ (void)setResourcePath:(NSString *)resourcePath;
-
-+ (WebAuthenticationBroker *)sharedInstance;
-
-- (void)start:(NSURL *)startURL end:(NSURL *)endURL webView:(WebViewType *)webView fullScreen:(BOOL)fullScreen completion: (ADBrokerCallback) completionBlock;
-- (void)cancel;
+/*! Initializes the token cache store.
+ @param: cacheLocation: The file location. If a relative path is specified,
+ the class will put the file in the local cache folder. 
+ The initializer returns nil, if cacheLocation is invalid path.*/
+-(id) initWithLocation: (NSString *)cacheLocation;
 
 @end
