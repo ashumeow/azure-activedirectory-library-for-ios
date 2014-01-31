@@ -34,6 +34,7 @@
 - (IBAction)getUsersPressed:(id)sender;
 - (IBAction)refreshTokenPressed:(id)sender;
 - (IBAction)expireAllPressed:(id)sender;
+- (IBAction)promptAlways:(id)sender;
 @property (weak, nonatomic) IBOutlet UIButton *end2end;
 
 @end
@@ -119,12 +120,13 @@
 //         }
          
          //401 worked, now try to acquire the token:
-         //There is a temporary issue with the OmerCan account above, so currently, I am using another one:
-         NSString* authority = @"https://login.windows.net/msopentechbv.onmicrosoft.com";//OmerCan: params.authority
-         NSString* clientId = @"c3c7f5e5-7153-44d4-90e6-329686d48d76";//OmerCan: @"c4acbce5-b2ed-4dc5-a1b9-c95af96c0277"
-         resourceString = @"http://localhost/TodoListService";
-         NSString* redirectUri = @"http://todolistclient/";//OmerCan: @"https://omercantest.onmicrosoft.adal/hello"
-
+         //TODO: replace the authority here with the one that comes back from 'params'
+         NSString* authority = mAADInstance.authority;//params.authority;
+         NSString* clientId = mAADInstance.clientId;
+         resourceString = mAADInstance.resource;
+         NSString* redirectUri = mAADInstance.redirectUri;
+         NSString* userId = mAADInstance.userId;
+         [weakSelf setStatus:[NSString stringWithFormat:@"Authority: %@", mAADInstance.authority]];
          ADAuthenticationError* error;
          ADAuthenticationContext* context = [ADAuthenticationContext authenticationContextWithAuthority:authority error:&error];
          if (!context)
@@ -138,15 +140,16 @@
                                redirectUri:[NSURL URLWithString:redirectUri]
                                     userId:userId
                            completionBlock:^(ADAuthenticationResult *result) {
-                   if (result.status != AD_SUCCEEDED)
-                   {
-                       [weakSelf setStatus:result.error.errorDetails];
-                       return;
-                   }
-                   
-                   [weakSelf setStatus:[self processAccessToken:result.tokenCacheStoreItem.accessToken]];
-               }];
-     };
+                               if (result.status != AD_SUCCEEDED)
+                               {
+                                   [weakSelf setStatus:result.error.errorDetails];
+                                   return;
+                               }
+                               
+                               [weakSelf setStatus:[self processAccessToken:result.tokenCacheStoreItem.accessToken]];
+                           }];
+    }
+    //];
 }
 
 - (IBAction)clearCachePressed:(id)sender

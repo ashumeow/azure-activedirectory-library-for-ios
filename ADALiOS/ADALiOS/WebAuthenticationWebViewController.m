@@ -103,9 +103,6 @@
         return NO;
     }
     
-    // Remember visited URL
-    [_visited addObject:request.URL];
-    
     if (NO)
     {
         SecIdentityRef identity = NULL;
