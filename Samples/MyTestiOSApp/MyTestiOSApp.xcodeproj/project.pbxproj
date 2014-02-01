@@ -30,8 +30,6 @@
 		8BA42B2717E3C150002D206E /* CoreData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8BA42AFF17E3C150002D206E /* CoreData.framework */; };
 		8BA42B2F17E3C150002D206E /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 8BA42B2D17E3C150002D206E /* InfoPlist.strings */; };
 		8BA42B3117E3C150002D206E /* MyTestiOSAppTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 8BA42B3017E3C150002D206E /* MyTestiOSAppTests.m */; };
-		8BA87B3D1857D1CE00716BA8 /* IPAL_iPhone_Storyboard.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 8BA87B3B1857D1CE00716BA8 /* IPAL_iPhone_Storyboard.storyboard */; };
-		8BA87B3E1857D1CE00716BA8 /* IPAL_iPad_Storyboard.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 8BA87B3C1857D1CE00716BA8 /* IPAL_iPad_Storyboard.storyboard */; };
 		8BA87B451857EF8C00716BA8 /* TestCert.p12 in Resources */ = {isa = PBXBuildFile; fileRef = 8BA87B441857EF4200716BA8 /* TestCert.p12 */; };
 		8BAB18B4184576B700FDD4DD /* libADALiOS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8BAB18B3184576B700FDD4DD /* libADALiOS.a */; };
 		8BE96CBE1859439C00EE0764 /* ADALiOSBundle-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8BE96CB61859439C00EE0764 /* ADALiOSBundle-Info.plist */; };
@@ -81,8 +79,6 @@
 		8BA42B2C17E3C150002D206E /* MyTestiOSAppTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "MyTestiOSAppTests-Info.plist"; sourceTree = "<group>"; };
 		8BA42B2E17E3C150002D206E /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		8BA42B3017E3C150002D206E /* MyTestiOSAppTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MyTestiOSAppTests.m; sourceTree = "<group>"; };
-		8BA87B3B1857D1CE00716BA8 /* IPAL_iPhone_Storyboard.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; path = IPAL_iPhone_Storyboard.storyboard; sourceTree = "<group>"; };
-		8BA87B3C1857D1CE00716BA8 /* IPAL_iPad_Storyboard.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; path = IPAL_iPad_Storyboard.storyboard; sourceTree = "<group>"; };
 		8BA87B441857EF4200716BA8 /* TestCert.p12 */ = {isa = PBXFileReference; lastKnownFileType = file; path = TestCert.p12; sourceTree = "<group>"; };
 		8BAB18B3184576B700FDD4DD /* libADALiOS.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libADALiOS.a; path = "../../../../Library/Developer/Xcode/DerivedData/ADALiOS-ckezcambqztutxakbxsnwblsewcb/Build/Products/Debug-iphoneos/libADALiOS.a"; sourceTree = "<group>"; };
 		8BE96CB61859439C00EE0764 /* ADALiOSBundle-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "ADALiOSBundle-Info.plist"; sourceTree = "<group>"; };
@@ -176,9 +172,8 @@
 		8BA42B0217E3C150002D206E /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				8BE96CBD1859439C00EE0764 /* ADALiOSBundle */,
 				8BA87B441857EF4200716BA8 /* TestCert.p12 */,
-				8BA87B3B1857D1CE00716BA8 /* IPAL_iPhone_Storyboard.storyboard */,
-				8BA87B3C1857D1CE00716BA8 /* IPAL_iPad_Storyboard.storyboard */,
 				8BA42B0317E3C150002D206E /* MyTestiOSApp-Info.plist */,
 				8BA42B0417E3C150002D206E /* InfoPlist.strings */,
 				8BA42B0717E3C150002D206E /* main.m */,
@@ -315,10 +310,8 @@
 				8BE96CC21859439C00EE0764 /* ADALiOSBundle-Prefix.pch in Resources */,
 				8BE96CBE1859439C00EE0764 /* ADALiOSBundle-Info.plist in Resources */,
 				8BA42B0F17E3C150002D206E /* Main_iPhone.storyboard in Resources */,
-                8BA87B3E1857D1CE00716BA8 /* IPAL_iPad_Storyboard.storyboard in Resources */,
 				8B87548818988C4B0061999F /* TestData.plist in Resources */,
 				8BA42B0617E3C150002D206E /* InfoPlist.strings in Resources */,
-				8BA87B3D1857D1CE00716BA8 /* IPAL_iPhone_Storyboard.storyboard in Resources */,
 				8BA87B451857EF8C00716BA8 /* TestCert.p12 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
