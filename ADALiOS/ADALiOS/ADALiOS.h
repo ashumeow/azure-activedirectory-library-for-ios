@@ -93,6 +93,11 @@ argumentName:@#ARG]; \
 //Can be used only inside another macro.
 #define TO_NSSTRING(x) @"" x
 
+//One parameter assert:
+#define ADAssert(x) NSAssert((x), @"" #x)
+//Assert for strings:
+#define ADAssertNonBlank(x) NSAssert((![NSString isStringNilOrBlank:(x)]), @"" #x)
+
 //Logs public function call:
 #define API_ENTRY \
 { \

@@ -232,11 +232,11 @@ if (![self checkAndHandleBadArgument:ARG \
               completionBlock: (ADAuthenticationCallback)completionBlock
 {
     //All of these should be set before calling this method:
-    THROW_ON_NIL_ARGUMENT(item);
-    THROW_ON_NIL_EMPTY_ARGUMENT(resource);
-    THROW_ON_NIL_EMPTY_ARGUMENT(clientId);
     THROW_ON_NIL_ARGUMENT(completionBlock);
-    THROW_ON_NIL_ARGUMENT(correlationId);//Should have been set before this call
+    HANDLE_ARGUMENT(resource);
+    HANDLE_ARGUMENT(clientId);
+    ADAssert(correlationId);
+    ADAssert(item);
     
     if (useAccessToken)
     {
@@ -447,11 +447,11 @@ if (![self checkAndHandleBadArgument:ARG \
     return nil;//Nothing suitable
 }
 
-//Makes sure that the correlation id contains a valid UUID.
+//Internal helper: Makes sure that the correlation id contains a valid UUID.
 //Generates a new one if needed.
 -(void) updateCorrelationId: (NSUUID* __autoreleasing*) correlationId
 {
-    THROW_ON_NIL_ARGUMENT(correlationId);
+    ADAssert(correlationId);
     if (!*correlationId)
     {
         NSUUID* selfCorrelationId = self.correlationId;//Copy to avoid thread-safety issues in the check below:
@@ -634,15 +634,15 @@ if (![self checkAndHandleBadArgument:ARG \
                   cacheItem: (ADTokenCacheStoreItem*) cacheItem
            withRefreshToken: (NSString*) refreshToken
 {
-    THROW_ON_NIL_ARGUMENT(result);
+    ADAssert(result);
     
     if (!self.tokenCacheStore)
         return;//No cache to update
 
     if (AD_SUCCEEDED == result.status)
     {
-        THROW_ON_NIL_ARGUMENT(result.tokenCacheStoreItem);
-        THROW_ON_NIL_EMPTY_ARGUMENT(result.tokenCacheStoreItem.resource);
+        ADAssert(result.tokenCacheStoreItem);
+        ADAssertNonBlank(result.tokenCacheStoreItem.resource);
         THROW_ON_NIL_EMPTY_ARGUMENT(result.tokenCacheStoreItem.accessToken);
 
         //In case of success we use explicitly the item that comes back in the result:
